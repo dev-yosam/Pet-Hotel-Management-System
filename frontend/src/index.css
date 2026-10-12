@@ -1,23 +1,18 @@
-﻿:root {
-  font-family: system-ui, sans-serif;
-  line-height: 1.5;
-  color: #202938;
-  background-color: #f7f8fa;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-}
-
 body {
-  margin: 0;
   min-width: 320px;
 }
 
-main {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 32px 20px;
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 1500;
+  padding: 12px 16px;
+  background: white;
+  color: #24665a;
+  transform: translateY(-200%);
 }
 
-h1 {
-  font-size: clamp(1.75rem, 5vw, 2.5rem);
+.skip-link:focus {
+  transform: translateY(0);
 }
