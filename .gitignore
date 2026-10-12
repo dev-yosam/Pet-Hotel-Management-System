@@ -1,0 +1,17 @@
+**/bin/
+**/obj/
+TestResults/
+**/TestResults/
+.vs/
+*.user
+*.suo
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+.DS_Store
+Thumbs.db
