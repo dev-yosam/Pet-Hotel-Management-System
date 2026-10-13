@@ -1,10 +1,12 @@
+import { lazy, Suspense } from 'react'
 import { Button, Stack, Typography } from '@mui/material'
 import { Link, Navigate, Route, Routes } from 'react-router'
 import AppLayout from './components/AppLayout'
 import Dashboard from './pages/Dashboard/Dashboard'
 import PetCheckIn from './pages/PetCheckIn/PetCheckIn'
-import DailyCare from './pages/DailyCare/DailyCare'
 import StayHistory from './pages/StayHistory/StayHistory'
+
+const DailyCare = lazy(() => import('./pages/DailyCare/DailyCare'))
 
 function App() {
   return (
@@ -13,7 +15,11 @@ function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="pet-check-in" element={<PetCheckIn />} />
-        <Route path="daily-care" element={<DailyCare />} />
+        <Route path="daily-care" element={
+          <Suspense fallback={<Typography role="status">Loading Daily Care...</Typography>}>
+            <DailyCare />
+          </Suspense>
+        } />
         <Route path="stay-history" element={<StayHistory />} />
         <Route path="*" element={
           <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
