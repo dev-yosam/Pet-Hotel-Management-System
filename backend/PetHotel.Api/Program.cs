@@ -10,6 +10,7 @@ builder.Services.AddDbContext<PetHotelDbContext>(options =>
         ?? throw new InvalidOperationException("ConnectionStrings:PetHotel is not configured.")));
 
 builder.Services.AddScoped<IOwnerService, OwnerService>();
+builder.Services.AddScoped<IPetService, PetService>();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
