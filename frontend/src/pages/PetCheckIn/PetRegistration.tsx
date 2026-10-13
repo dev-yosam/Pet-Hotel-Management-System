@@ -1,0 +1,209 @@
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
+import {
+  Alert,
+  Button,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material'
+import { getErrorMessage } from '../../services/apiErrors'
+import type { OwnerResponse } from '../../services/ownerService'
+import {
+  createPet,
+  getPets,
+  updatePet,
+} from '../../services/petService'
+import type { PetResponse } from '../../services/petService'
+
+interface PetRegistrationProps {
+  owner: OwnerResponse
+}
+
+function PetRegistration({ owner }: PetRegistrationProps) {
+  const [pets, setPets] = useState<PetResponse[]>([])
+  const [selectedId, setSelectedId] = useState('')
+  const [name, setName] = useState('')
+  const [species, setSpecies] = useState('')
+  const [breed, setBreed] = useState('')
+  const [careInstructions, setCareInstructions] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    getPets(owner.id)
+      .then(data => {
+        if (active) {
+          setPets(data)
+        }
+      })
+      .catch(error => {
+        if (active) {
+          setLoadFailed(true)
+          setError(getErrorMessage(error))
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [owner.id])
+
+  function selectPet(value: string) {
+    const pet = pets.find(item => String(item.id) === value)
+
+    setSelectedId(value)
+    setName(pet?.name ?? '')
+    setSpecies(pet?.species ?? '')
+    setBreed(pet?.breed ?? '')
+    setCareInstructions(pet?.careInstructions ?? '')
+    setError('')
+    setSuccess('')
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    setSuccess('')
+
+    if (!name.trim() || !species.trim()) {
+      setError('Pet name and species must not be blank.')
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      const request = {
+        ownerId: owner.id,
+        name: name.trim(),
+        species: species.trim(),
+        breed: breed.trim() || null,
+        careInstructions: careInstructions.trim() || null,
+      }
+
+      const saved = selectedId
+        ? await updatePet(Number(selectedId), request)
+        : await createPet(request)
+
+      setPets(current => [
+        ...current.filter(pet => pet.id !== saved.id),
+        saved,
+      ])
+      setSelectedId(String(saved.id))
+      setName(saved.name)
+      setSpecies(saved.species)
+      setBreed(saved.breed ?? '')
+      setCareInstructions(saved.careInstructions ?? '')
+      setSuccess(selectedId ? 'Pet updated.' : 'Pet registered.')
+    } catch (error) {
+      setError(getErrorMessage(error))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const disabled = loading || saving || loadFailed
+
+  return (
+    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+      <Stack component="form" spacing={2} onSubmit={handleSubmit}>
+        <Typography variant="h6" component="h2">
+          Pet Registration
+        </Typography>
+
+        <Typography color="text.secondary">
+          Owner: {owner.fullName} — {owner.phone}
+        </Typography>
+
+        {error && <Alert severity="error">{error}</Alert>}
+        {success && <Alert severity="success">{success}</Alert>}
+
+        <TextField
+          select
+          label="Pet"
+          value={selectedId}
+          onChange={event => selectPet(event.target.value)}
+          disabled={disabled}
+          helperText={loading
+            ? 'Loading pets…'
+            : 'Select a pet to edit, or choose Register new pet.'}
+          fullWidth
+        >
+          <MenuItem value="">Register new pet</MenuItem>
+          {pets.map(pet => (
+            <MenuItem key={pet.id} value={String(pet.id)}>
+              {pet.name} — {pet.species} (ID: {pet.id})
+            </MenuItem>
+          ))}
+        </TextField>
+
+        <TextField
+          label="Pet name"
+          value={name}
+          onChange={event => setName(event.target.value)}
+          slotProps={{ htmlInput: { maxLength: 100 } }}
+          disabled={disabled}
+          required
+          fullWidth
+        />
+
+        <TextField
+          label="Species"
+          value={species}
+          onChange={event => setSpecies(event.target.value)}
+          slotProps={{ htmlInput: { maxLength: 50 } }}
+          helperText="For example, Dog or Cat."
+          disabled={disabled}
+          required
+          fullWidth
+        />
+
+        <TextField
+          label="Breed"
+          value={breed}
+          onChange={event => setBreed(event.target.value)}
+          slotProps={{ htmlInput: { maxLength: 100 } }}
+          disabled={disabled}
+          fullWidth
+        />
+
+        <TextField
+          label="Care instructions"
+          value={careInstructions}
+          onChange={event => setCareInstructions(event.target.value)}
+          slotProps={{ htmlInput: { maxLength: 1000 } }}
+          disabled={disabled}
+          multiline
+          minRows={3}
+          fullWidth
+        />
+
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={disabled}
+          sx={{ alignSelf: { xs: 'stretch', sm: 'flex-start' } }}
+        >
+          {saving
+            ? 'Saving…'
+            : selectedId ? 'Save pet changes' : 'Register pet'}
+        </Button>
+      </Stack>
+    </Paper>
+  )
+}
+
+export default PetRegistration

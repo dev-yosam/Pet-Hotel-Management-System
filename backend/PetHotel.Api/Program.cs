@@ -9,6 +9,8 @@ builder.Services.AddDbContext<PetHotelDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("PetHotel")
         ?? throw new InvalidOperationException("ConnectionStrings:PetHotel is not configured.")));
 
+builder.Services.AddScoped<IOwnerService, OwnerService>();
+builder.Services.AddScoped<IPetService, PetService>();
 builder.Services.AddControllers();
 builder.Services.AddScoped<ICareService, CareService>();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
