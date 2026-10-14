@@ -11,6 +11,7 @@ builder.Services.AddDbContext<PetHotelDbContext>(options =>
 
 builder.Services.AddScoped<IOwnerService, OwnerService>();
 builder.Services.AddScoped<IPetService, PetService>();
+builder.Services.AddScoped<IRoomService, RoomService>();
 builder.Services.AddControllers();
 builder.Services.AddScoped<ICareService, CareService>();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
