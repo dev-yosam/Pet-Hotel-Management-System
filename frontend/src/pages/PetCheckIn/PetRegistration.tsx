@@ -20,9 +20,13 @@ import type { PetResponse } from '../../services/petService'
 
 interface PetRegistrationProps {
   owner: OwnerResponse
+  onPetChange: (pet: PetResponse | null) => void
 }
 
-function PetRegistration({ owner }: PetRegistrationProps) {
+function PetRegistration({
+  owner,
+  onPetChange,
+}: PetRegistrationProps) {
   const [pets, setPets] = useState<PetResponse[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [name, setName] = useState('')
@@ -65,6 +69,7 @@ function PetRegistration({ owner }: PetRegistrationProps) {
     const pet = pets.find(item => String(item.id) === value)
 
     setSelectedId(value)
+    onPetChange(pet ?? null)
     setName(pet?.name ?? '')
     setSpecies(pet?.species ?? '')
     setBreed(pet?.breed ?? '')
@@ -103,6 +108,7 @@ function PetRegistration({ owner }: PetRegistrationProps) {
         saved,
       ])
       setSelectedId(String(saved.id))
+      onPetChange(saved)
       setName(saved.name)
       setSpecies(saved.species)
       setBreed(saved.breed ?? '')

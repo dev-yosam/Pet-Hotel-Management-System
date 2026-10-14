@@ -22,6 +22,16 @@ public class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : IExcepti
             };
             message = careException.Message;
         }
+        else if (exception is BookingException bookingException)
+        {
+            status = bookingException.Error switch
+            {
+                BookingError.InvalidInput => StatusCodes.Status400BadRequest,
+                BookingError.NotFound => StatusCodes.Status404NotFound,
+                _ => StatusCodes.Status409Conflict
+            };
+            message = bookingException.Message;
+        }
         else if (exception is DbUpdateConcurrencyException)
         {
             status = StatusCodes.Status409Conflict;
