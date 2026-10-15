@@ -1,3 +1,4 @@
+﻿import DateInput from '../../components/DateInput'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import {
@@ -160,26 +161,22 @@ function RoomBooking({ pet }: RoomBookingProps) {
         )}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
+          <DateInput
             label="Check-in (Sydney time)"
-            type="datetime-local"
+            withTime
             value={checkIn}
-            onChange={event => changeDates(event.target.value, 'checkIn')}
-            slotProps={{ inputLabel: { shrink: true } }}
+            onChange={value => changeDates(value, 'checkIn')}
             disabled={busy}
             required
-            fullWidth
           />
 
-          <TextField
+          <DateInput
             label="Check-out (Sydney time)"
-            type="datetime-local"
+            withTime
             value={checkOut}
-            onChange={event => changeDates(event.target.value, 'checkOut')}
-            slotProps={{ inputLabel: { shrink: true } }}
+            onChange={value => changeDates(value, 'checkOut')}
             disabled={busy}
             required
-            fullWidth
           />
         </Stack>
 
@@ -207,7 +204,6 @@ function RoomBooking({ pet }: RoomBookingProps) {
             onChange={event => setRoomId(event.target.value)}
             disabled={busy}
             required
-            fullWidth
           >
             {rooms.map(room => (
               <MenuItem key={room.id} value={String(room.id)}>
