@@ -21,6 +21,7 @@ builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddScoped<IStayService, StayService>();
 builder.Services.AddControllers();
 builder.Services.AddScoped<ICareService, CareService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
