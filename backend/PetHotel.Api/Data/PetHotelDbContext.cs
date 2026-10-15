@@ -40,6 +40,7 @@ public class PetHotelDbContext(DbContextOptions<PetHotelDbContext> options) : Db
         modelBuilder.Entity<Stay>(entity =>
         {
             entity.Property(stay => stay.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(stay => stay.TotalCharge).HasPrecision(10, 2);
             entity.HasOne(stay => stay.Pet).WithMany(pet => pet.Stays)
                 .HasForeignKey(stay => stay.PetId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(stay => stay.Room).WithMany(room => room.Stays)

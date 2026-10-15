@@ -464,6 +464,36 @@ public class StayServiceTests
         });
     }
 
+    [Test]
+    public async Task TotalCharge_BeforeSettlement_IsNull()
+    {
+        await using var verification = new PetHotelDbContext(options);
+
+        var saved = await verification.Stays
+            .AsNoTracking()
+            .SingleAsync(stay => stay.Id == stayId);
+
+        Assert.That(saved.TotalCharge, Is.Null);
+    }
+
+    [Test]
+    public async Task TotalCharge_WithDecimalAmount_PersistsValue()
+    {
+        var stay = await dbContext.Stays
+            .SingleAsync(stay => stay.Id == stayId);
+
+        stay.TotalCharge = 123.45m;
+        await dbContext.SaveChangesAsync();
+
+        await using var verification = new PetHotelDbContext(options);
+
+        var saved = await verification.Stays
+            .AsNoTracking()
+            .SingleAsync(stay => stay.Id == stayId);
+
+        Assert.That(saved.TotalCharge, Is.EqualTo(123.45m));
+    }
+
     private sealed class FixedTimeProvider(
         DateTimeOffset utcNow) : TimeProvider
     {
