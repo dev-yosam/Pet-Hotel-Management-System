@@ -13,6 +13,8 @@ builder.Services.AddScoped<IOwnerService, OwnerService>();
 builder.Services.AddScoped<IPetService, PetService>();
 builder.Services.AddScoped<IRoomService, RoomService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+builder.Services.AddScoped<IStayService, StayService>();
 builder.Services.AddControllers();
 builder.Services.AddScoped<ICareService, CareService>();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
