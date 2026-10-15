@@ -9,6 +9,7 @@ public class Stay
     public DateTimeOffset ScheduledCheckOut { get; set; }
     public DateTimeOffset? ActualCheckIn { get; set; }
     public DateTimeOffset? ActualCheckOut { get; set; }
+    public decimal? TotalCharge { get; set; }
     public StayStatus Status { get; set; } = StayStatus.Booked;
     public Pet Pet { get; set; } = null!;
     public Room Room { get; set; } = null!;

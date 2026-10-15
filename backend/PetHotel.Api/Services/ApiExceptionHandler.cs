@@ -31,6 +31,17 @@ public class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : IExcepti
                 _ => StatusCodes.Status409Conflict
             };
             message = bookingException.Message;
+
+        }
+        else if (exception is StayException stayException)
+        {
+            status = stayException.Error switch
+            {
+                StayError.InvalidInput => StatusCodes.Status400BadRequest,
+                StayError.NotFound => StatusCodes.Status404NotFound,
+                _ => StatusCodes.Status409Conflict
+            };
+            message = stayException.Message;
         }
         else if (exception is DbUpdateConcurrencyException)
         {
