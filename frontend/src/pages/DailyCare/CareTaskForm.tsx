@@ -1,3 +1,4 @@
+﻿import DateInput from '../../components/DateInput'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Button, Paper, Stack, TextField, Typography } from '@mui/material'
@@ -50,12 +51,11 @@ function CareTaskForm({ stay, disabled, onCreate }: Props) {
           helperText={errors.description || 'Up to 500 characters.'}
           slotProps={{ htmlInput: { maxLength: 500 } }}
         />
-        <TextField
-          label="Scheduled time" type="datetime-local" required
-          value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)}
+        <DateInput
+          label="Scheduled time" withTime required
+          value={scheduledAt} onChange={setScheduledAt}
           disabled={disabled} error={Boolean(errors.scheduledAt)}
           helperText={errors.scheduledAt || `Local time: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`}
-          slotProps={{ inputLabel: { shrink: true } }}
         />
         <Button type="submit" variant="contained" disabled={disabled} sx={{ alignSelf: 'flex-start' }}>
           Add task
@@ -66,3 +66,4 @@ function CareTaskForm({ stay, disabled, onCreate }: Props) {
 }
 
 export default CareTaskForm
+

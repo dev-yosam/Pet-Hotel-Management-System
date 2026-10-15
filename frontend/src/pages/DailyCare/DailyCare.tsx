@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import {
   Alert, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogContentText, DialogTitle, FormControlLabel, MenuItem, Paper, Stack, TextField, Typography,
@@ -22,7 +22,7 @@ function errorMessage(error: unknown) {
 }
 
 function formatTime(value: string) {
-  return new Date(value).toLocaleString()
+  return new Date(value).toLocaleString('en-AU')
 }
 
 function DailyCare() {
@@ -233,3 +233,4 @@ function DailyCare() {
 }
 
 export default DailyCare
+
