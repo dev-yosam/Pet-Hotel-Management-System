@@ -4,6 +4,7 @@ using Npgsql;
 using PetHotel.Api.Data;
 using PetHotel.Api.Models;
 using PetHotel.Api.Services;
+using PetHotel.Api.Services.Pricing;
 
 namespace PetHotel.Tests;
 
@@ -57,7 +58,8 @@ public class StayServiceTests
         dbContext = new PetHotelDbContext(options);
         service = new StayService(
             dbContext,
-            new FixedTimeProvider(Now));
+            new FixedTimeProvider(Now),
+            CreateChargeCalculator());
 
         var owner = new Owner
         {
@@ -219,7 +221,8 @@ public class StayServiceTests
 
         var laterService = new StayService(
             dbContext,
-            new FixedTimeProvider(Now.AddMinutes(10)));
+            new FixedTimeProvider(Now.AddMinutes(10)),
+            CreateChargeCalculator());
 
         var exception = Assert.ThrowsAsync<StayException>(async () =>
         {
@@ -421,7 +424,8 @@ public class StayServiceTests
             await using var context = new PetHotelDbContext(options);
             var stayService = new StayService(
                 context,
-                new FixedTimeProvider(Now));
+                new FixedTimeProvider(Now),
+                CreateChargeCalculator());
 
             await start.Task.WaitAsync(timeout.Token);
 
@@ -493,7 +497,313 @@ public class StayServiceTests
 
         Assert.That(saved.TotalCharge, Is.EqualTo(123.45m));
     }
+    private static StayChargeCalculator CreateChargeCalculator()
+    {
+        return new StayChargeCalculator(
+        [
+            new StandardRoomPricing(),
+            new DeluxeRoomPricing()
+        ]);
+    }
 
+    [TestCase("Standard", 2, 80)]
+    [TestCase("Deluxe", 2, 120)]
+    [TestCase("Deluxe", 7, 378)]
+    public async Task CheckOut_WithValidStay_PersistsSettlement(
+    string roomType,
+    int nights,
+    int expectedAmount)
+    {
+        var scheduledCheckIn = Now.AddHours(-1);
+        var scheduledCheckOut = scheduledCheckIn.AddDays(nights);
+
+        await dbContext.Rooms
+            .Where(room => room.Id == roomId)
+            .ExecuteUpdateAsync(update =>
+                update.SetProperty(room => room.RoomType, roomType));
+
+        await dbContext.Stays
+            .Where(stay => stay.Id == stayId)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(
+                    stay => stay.ScheduledCheckIn,
+                    scheduledCheckIn)
+                .SetProperty(
+                    stay => stay.ScheduledCheckOut,
+                    scheduledCheckOut));
+
+        await service.CheckInAsync(stayId);
+
+        var checkOutTime = Now.AddHours(1);
+        var checkOutService = new StayService(
+            dbContext,
+            new FixedTimeProvider(checkOutTime),
+            CreateChargeCalculator());
+
+        var response = await checkOutService.CheckOutAsync(stayId);
+
+        await using var verification = new PetHotelDbContext(options);
+        var saved = await verification.Stays
+            .AsNoTracking()
+            .SingleAsync(stay => stay.Id == stayId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo("CheckedOut"));
+            Assert.That(
+                response.TotalCharge,
+                Is.EqualTo((decimal)expectedAmount));
+            Assert.That(response.ActualCheckOut, Is.EqualTo(checkOutTime));
+
+            Assert.That(saved.Status, Is.EqualTo(StayStatus.CheckedOut));
+            Assert.That(saved.ActualCheckIn, Is.EqualTo(Now));
+            Assert.That(saved.ActualCheckOut, Is.EqualTo(checkOutTime));
+            Assert.That(
+                saved.TotalCharge,
+                Is.EqualTo((decimal)expectedAmount));
+            Assert.That(
+                saved.ScheduledCheckIn,
+                Is.EqualTo(scheduledCheckIn));
+            Assert.That(
+                saved.ScheduledCheckOut,
+                Is.EqualTo(scheduledCheckOut));
+        });
+
+        var queried = await checkOutService.GetByIdAsync(stayId);
+
+        Assert.That(queried, Is.Not.Null);
+        Assert.That(
+            queried!.TotalCharge,
+            Is.EqualTo((decimal)expectedAmount));
+    }
+    [Test]
+    public async Task CheckOut_WhenAlreadyCheckedOut_PreservesSettlement()
+    {
+        await service.CheckInAsync(stayId);
+
+        var firstCheckOutTime = Now.AddHours(1);
+        var firstService = new StayService(
+            dbContext,
+            new FixedTimeProvider(firstCheckOutTime),
+            CreateChargeCalculator());
+
+        var firstResponse = await firstService.CheckOutAsync(stayId);
+
+        var laterService = new StayService(
+            dbContext,
+            new FixedTimeProvider(Now.AddHours(2)),
+            CreateChargeCalculator());
+
+        var exception = Assert.ThrowsAsync<StayException>(async () =>
+        {
+            await laterService.CheckOutAsync(stayId);
+        });
+
+        await using var verification = new PetHotelDbContext(options);
+        var saved = await verification.Stays
+            .AsNoTracking()
+            .SingleAsync(stay => stay.Id == stayId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Error, Is.EqualTo(StayError.Conflict));
+            Assert.That(saved.Status, Is.EqualTo(StayStatus.CheckedOut));
+            Assert.That(saved.ActualCheckOut, Is.EqualTo(firstCheckOutTime));
+            Assert.That(saved.TotalCharge, Is.EqualTo(firstResponse.TotalCharge));
+        });
+    }
+    [TestCase(StayStatus.Booked)]
+    [TestCase(StayStatus.Cancelled)]
+    public async Task CheckOut_WithInvalidStatus_DoesNotSettle(
+    StayStatus status)
+    {
+        await dbContext.Stays
+            .Where(stay => stay.Id == stayId)
+            .ExecuteUpdateAsync(update =>
+                update.SetProperty(stay => stay.Status, status));
+
+        var exception = Assert.ThrowsAsync<StayException>(async () =>
+        {
+            await service.CheckOutAsync(stayId);
+        });
+
+        await using var verification = new PetHotelDbContext(options);
+        var saved = await verification.Stays
+            .AsNoTracking()
+            .SingleAsync(stay => stay.Id == stayId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Error, Is.EqualTo(StayError.Conflict));
+            Assert.That(saved.Status, Is.EqualTo(status));
+            Assert.That(saved.ActualCheckIn, Is.Null);
+            Assert.That(saved.ActualCheckOut, Is.Null);
+            Assert.That(saved.TotalCharge, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task CheckOut_WithoutActualCheckIn_DoesNotSettle()
+    {
+        await dbContext.Stays
+            .Where(stay => stay.Id == stayId)
+            .ExecuteUpdateAsync(update =>
+                update.SetProperty(
+                    stay => stay.Status,
+                    StayStatus.CheckedIn));
+
+        await AssertCheckOutRejectedAsync(
+            service,
+            StayError.Conflict,
+            expectedCheckIn: null);
+    }
+
+    [Test]
+    public async Task CheckOut_BeforeActualCheckIn_DoesNotSettle()
+    {
+        await service.CheckInAsync(stayId);
+
+        var earlierService = new StayService(
+            dbContext,
+            new FixedTimeProvider(Now.AddSeconds(-1)),
+            CreateChargeCalculator());
+
+        await AssertCheckOutRejectedAsync(
+            earlierService,
+            StayError.Conflict,
+            expectedCheckIn: Now);
+    }
+
+    [Test]
+    public async Task CheckOut_WithUnknownRoomType_DoesNotSettle()
+    {
+        await service.CheckInAsync(stayId);
+
+        await dbContext.Rooms
+            .Where(room => room.Id == roomId)
+            .ExecuteUpdateAsync(update =>
+                update.SetProperty(room => room.RoomType, "Unknown"));
+
+        await AssertCheckOutRejectedAsync(
+            service,
+            StayError.InvalidInput,
+            expectedCheckIn: Now);
+    }
+
+    [TestCase(0)]
+    [TestCase(-1)]
+    public void CheckOut_WithInvalidId_ThrowsInvalidInput(int id)
+    {
+        var exception = Assert.ThrowsAsync<StayException>(async () =>
+        {
+            await service.CheckOutAsync(id);
+        });
+
+        Assert.That(exception!.Error, Is.EqualTo(StayError.InvalidInput));
+    }
+
+    [Test]
+    public async Task CheckOut_WhenStayDoesNotExist_ThrowsNotFound()
+    {
+        await dbContext.Stays
+            .Where(stay => stay.Id == stayId)
+            .ExecuteDeleteAsync();
+
+        var exception = Assert.ThrowsAsync<StayException>(async () =>
+        {
+            await service.CheckOutAsync(stayId);
+        });
+
+        Assert.That(exception!.Error, Is.EqualTo(StayError.NotFound));
+    }
+
+    private async Task AssertCheckOutRejectedAsync(
+        StayService stayService,
+        StayError expectedError,
+        DateTimeOffset? expectedCheckIn)
+    {
+        var exception = Assert.ThrowsAsync<StayException>(async () =>
+        {
+            await stayService.CheckOutAsync(stayId);
+        });
+
+        await using var verification = new PetHotelDbContext(options);
+        var saved = await verification.Stays
+            .AsNoTracking()
+            .SingleAsync(stay => stay.Id == stayId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Error, Is.EqualTo(expectedError));
+            Assert.That(saved.Status, Is.EqualTo(StayStatus.CheckedIn));
+            Assert.That(saved.ActualCheckIn, Is.EqualTo(expectedCheckIn));
+            Assert.That(saved.ActualCheckOut, Is.Null);
+            Assert.That(saved.TotalCharge, Is.Null);
+        });
+    }
+    [Test]
+    public async Task CheckOut_WithConcurrentRequests_OnlyOneSucceeds()
+    {
+        await service.CheckInAsync(stayId);
+
+        using var timeout =
+            new CancellationTokenSource(TimeSpan.FromSeconds(15));
+
+        var start = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var checkOutTime = Now.AddHours(1);
+
+        async Task<StayError?> TryCheckOutAsync()
+        {
+            await using var context = new PetHotelDbContext(options);
+
+            var stayService = new StayService(
+                context,
+                new FixedTimeProvider(checkOutTime),
+                CreateChargeCalculator());
+
+            await start.Task.WaitAsync(timeout.Token);
+
+            try
+            {
+                await stayService.CheckOutAsync(stayId, timeout.Token);
+                return null;
+            }
+            catch (StayException exception)
+            {
+                return exception.Error;
+            }
+        }
+
+        var firstRequest = TryCheckOutAsync();
+        var secondRequest = TryCheckOutAsync();
+
+        start.SetResult(true);
+
+        var results = await Task.WhenAll(firstRequest, secondRequest);
+
+        await using var verification = new PetHotelDbContext(options);
+        var saved = await verification.Stays
+            .AsNoTracking()
+            .SingleAsync(stay => stay.Id == stayId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                results.Count(result => result is null),
+                Is.EqualTo(1));
+
+            Assert.That(
+                results.Count(result => result == StayError.Conflict),
+                Is.EqualTo(1));
+
+            Assert.That(saved.Status, Is.EqualTo(StayStatus.CheckedOut));
+            Assert.That(saved.ActualCheckIn, Is.EqualTo(Now));
+            Assert.That(saved.ActualCheckOut, Is.EqualTo(checkOutTime));
+            Assert.That(saved.TotalCharge, Is.EqualTo(80m));
+        });
+    }
     private sealed class FixedTimeProvider(
         DateTimeOffset utcNow) : TimeProvider
     {

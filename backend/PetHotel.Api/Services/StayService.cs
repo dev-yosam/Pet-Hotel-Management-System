@@ -9,7 +9,8 @@ namespace PetHotel.Api.Services;
 
 public class StayService(
     PetHotelDbContext dbContext,
-    TimeProvider timeProvider) : IStayService
+    TimeProvider timeProvider,
+    IStayChargeCalculator chargeCalculator) : IStayService
 {
     public async Task<StayResponse?> GetByIdAsync(
         int id,
@@ -145,6 +146,117 @@ public class StayService(
         return ToResponse(stay);
     }
 
+    public async Task<StayResponse> CheckOutAsync(
+    int id,
+    CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            throw new StayException(
+                StayError.InvalidInput,
+                "Stay ID must be greater than zero.");
+        }
+
+        await using var transaction =
+            await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.ReadCommitted,
+                cancellationToken);
+
+        var roomId = await dbContext.Stays
+            .AsNoTracking()
+            .Where(stay => stay.Id == id)
+            .Select(stay => (int?)stay.RoomId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (roomId is null)
+        {
+            throw new StayException(
+                StayError.NotFound,
+                "Stay not found.");
+        }
+
+        // Use the same lock order as check-in.
+        var rooms = await dbContext.Rooms
+            .FromSqlInterpolated(
+                $"""SELECT * FROM "Rooms" WHERE "Id" = {roomId.Value} FOR UPDATE""")
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var room = rooms.SingleOrDefault();
+
+        if (room is null)
+        {
+            throw new StayException(
+                StayError.NotFound,
+                "Room not found.");
+        }
+
+        var stays = await dbContext.Stays
+            .FromSqlInterpolated(
+                $"""SELECT * FROM "Stays" WHERE "Id" = {id} FOR UPDATE""")
+            .ToListAsync(cancellationToken);
+
+        var stay = stays.SingleOrDefault();
+
+        if (stay is null)
+        {
+            throw new StayException(
+                StayError.NotFound,
+                "Stay not found.");
+        }
+
+        await dbContext.Entry(stay).ReloadAsync(cancellationToken);
+
+        if (stay.RoomId != room.Id)
+        {
+            throw new StayException(
+                StayError.Conflict,
+                "The assigned room has changed. Refresh and try again.");
+        }
+
+        if (stay.Status != StayStatus.CheckedIn ||
+            stay.ActualCheckIn is null ||
+            stay.ActualCheckOut is not null ||
+            stay.TotalCharge is not null)
+        {
+            throw new StayException(
+                StayError.Conflict,
+                "Only checked-in stays without a settlement can check out.");
+        }
+
+        var now = timeProvider.GetUtcNow();
+
+        if (now < stay.ActualCheckIn.Value)
+        {
+            throw new StayException(
+                StayError.Conflict,
+                "Check-out cannot be before actual check-in.");
+        }
+
+        var totalCharge = chargeCalculator.CalculateCharge(
+            room.RoomType,
+            stay.ScheduledCheckIn,
+            stay.ScheduledCheckOut);
+
+        if (totalCharge < 0m || totalCharge > 99999999.99m)
+        {
+            throw new StayException(
+                StayError.InvalidInput,
+                "The calculated charge is outside the supported range.");
+        }
+
+        stay.TotalCharge = totalCharge;
+        stay.ActualCheckOut = now;
+        stay.Status = StayStatus.CheckedOut;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.Entry(stay).ReloadAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return ToResponse(stay);
+    }
+
     private static StayResponse ToResponse(Stay stay)
     {
         return new StayResponse
@@ -156,6 +268,7 @@ public class StayService(
             ScheduledCheckOut = stay.ScheduledCheckOut,
             ActualCheckIn = stay.ActualCheckIn,
             ActualCheckOut = stay.ActualCheckOut,
+            TotalCharge = stay.TotalCharge,
             Status = stay.Status.ToString()
         };
     }

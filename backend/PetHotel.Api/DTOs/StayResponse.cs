@@ -10,4 +10,5 @@ public class StayResponse
     public DateTimeOffset? ActualCheckIn { get; set; }
     public DateTimeOffset? ActualCheckOut { get; set; }
     public string Status { get; set; } = string.Empty;
+    public decimal? TotalCharge { get; set; }
 }

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PetHotel.Api.Data;
 using PetHotel.Api.Interfaces;
 using PetHotel.Api.Services;
+using PetHotel.Api.Services.Pricing;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,9 @@ builder.Services.AddScoped<IOwnerService, OwnerService>();
 builder.Services.AddScoped<IPetService, PetService>();
 builder.Services.AddScoped<IRoomService, RoomService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddSingleton<RoomPricing, StandardRoomPricing>();
+builder.Services.AddSingleton<RoomPricing, DeluxeRoomPricing>();
+builder.Services.AddSingleton<IStayChargeCalculator, StayChargeCalculator>();
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddScoped<IStayService, StayService>();
 builder.Services.AddControllers();

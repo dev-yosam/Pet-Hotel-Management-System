@@ -11,4 +11,7 @@ public interface IStayService
     Task<StayResponse> CheckInAsync(
         int id,
         CancellationToken cancellationToken = default);
+    Task<StayResponse> CheckOutAsync(
+    int id,
+    CancellationToken cancellationToken = default);
 }

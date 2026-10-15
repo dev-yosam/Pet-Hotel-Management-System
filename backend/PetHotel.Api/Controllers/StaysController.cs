@@ -37,4 +37,16 @@ public class StaysController(IStayService stayService) : ControllerBase
 
         return Ok(stay);
     }
+
+    [HttpPost("{id:int}/check-out")]
+    public async Task<ActionResult<StayResponse>> CheckOut(
+        [Range(1, int.MaxValue)] int id,
+        CancellationToken cancellationToken)
+    {
+        var stay = await stayService.CheckOutAsync(
+            id,
+            cancellationToken);
+
+        return Ok(stay);
+    }
 }
