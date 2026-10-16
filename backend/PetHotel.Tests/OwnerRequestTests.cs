@@ -5,6 +5,34 @@ namespace PetHotel.Tests;
 
 public class OwnerRequestTests
 {
+    [TestCase("2123", false)]
+    [TestCase("Sam123", false)]
+    [TestCase("---", false)]
+    [TestCase("Sam@", false)]
+    [TestCase("Anne-Marie O'Neill", true)]
+    [TestCase("José Lee", true)]
+    [TestCase("王小明", true)]
+    public void FullName_Format_ReturnsExpectedResult(string name, bool expected)
+    {
+        var request = CreateValidRequest();
+        request.FullName = name;
+        Assert.That(IsValid(request), Is.EqualTo(expected));
+    }
+
+    [TestCase("rewrew", false)]
+    [TestCase("0412abc678", false)]
+    [TestCase("+ ()-", false)]
+    [TestCase("04+12345678", false)]
+    [TestCase("0412345678", true)]
+    [TestCase("+61 412 345 678", true)]
+    [TestCase("(02) 1234-5678", true)]
+    public void Phone_Format_ReturnsExpectedResult(string phone, bool expected)
+    {
+        var request = CreateValidRequest();
+        request.Phone = phone;
+        Assert.That(IsValid(request), Is.EqualTo(expected));
+    }
+
     [TestCase(null)]
     [TestCase("")]
     [TestCase("   ")]

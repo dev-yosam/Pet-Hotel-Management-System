@@ -1,5 +1,9 @@
 ﻿import DateInput from '../../components/DateInput'
 import { useEffect, useState, type FormEvent } from 'react'
+import StayActions from '../../components/StayActions'
+import { getErrorMessage } from '../../services/apiErrors'
+import { Temporal } from '@js-temporal/polyfill'
+import { formatSydneyTime } from '../../services/bookingTime'
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   LinearProgress, MenuItem, Paper, Stack, TextField, Typography,
@@ -12,11 +16,8 @@ const emptyFilters: StayHistoryFilters = { pet: '', owner: '', from: '', to: '',
 const statuses: Record<string, string> = {
   Booked: 'Booked', CheckedIn: 'Checked in', CheckedOut: 'Checked out', Cancelled: 'Cancelled',
 }
-const dateFormatter = new Intl.DateTimeFormat('en-AU', {
-  timeZone: 'Australia/Sydney', dateStyle: 'medium', timeStyle: 'short',
-})
 function formatTime(value: string | null) {
-  return value ? dateFormatter.format(new Date(value)) : 'Not recorded'
+  return value ? formatSydneyTime(value) : 'Not recorded'
 }
 
 function StayHistory() {
@@ -27,13 +28,14 @@ function StayHistory() {
   const [error, setError] = useState('')
   const [validationError, setValidationError] = useState('')
   const [selected, setSelected] = useState<StayHistoryItem | null>(null)
+  const [success, setSuccess] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
     searchStayHistory(request.filters, request.page, controller.signal)
       .then(data => { if (!controller.signal.aborted) setResult(data) })
       .catch((reason: unknown) => {
-        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to load stays.')
+        if (!controller.signal.aborted) setError(getErrorMessage(reason))
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
@@ -49,6 +51,19 @@ function StayHistory() {
 
   function search(event: FormEvent) {
     event.preventDefault()
+    if (event.currentTarget.querySelector('[aria-invalid="true"]')) {
+      setValidationError('Enter a valid date before year 9999.')
+      return
+    }
+    try {
+      for (const date of [filters.from, filters.to]) {
+        if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Temporal.PlainDate.from(date).year > 9998))
+          throw new Error()
+      }
+    } catch {
+      setValidationError('Enter a valid date before year 9999.')
+      return
+    }
     if (filters.from && filters.to && filters.from > filters.to) {
       setValidationError('End date must be on or after start date.')
       return
@@ -70,7 +85,8 @@ function StayHistory() {
   return (
     <Stack spacing={3}>
       <Typography variant="h4" component="h1">Stay History</Typography>
-      <Paper component="form" variant="outlined" onSubmit={search} sx={{ p: 3 }}>
+      {success && <Alert severity="success" onClose={() => setSuccess('')}>{success}</Alert>}
+      <Paper component="form" noValidate variant="outlined" onSubmit={search} sx={{ p: 3 }}>
         <Stack spacing={2}>
           <Typography color="text.secondary">Search planned arrival dates. All times use Australia/Sydney.</Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
@@ -137,6 +153,10 @@ function StayHistory() {
             <Typography>Actual check-out: {formatTime(selected.actualCheckOut)}</Typography>
             <Typography>Total charge: {selected.totalCharge === null ? 'Not calculated' : new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(selected.totalCharge)}</Typography>
             <Typography variant="body2" color="text.secondary">All times use Australia/Sydney.</Typography>
+            <StayActions key={selected.id} stayId={selected.id} status={selected.status} onChanged={stay => {
+              setSuccess(stay.status === 'CheckedIn' ? 'Pet checked in.' : 'Pet checked out. Open the stay details to view the final charge.')
+              load(request.filters, request.page)
+            }} />
           </Stack>}
         </DialogContent>
         <DialogActions><Button onClick={() => setSelected(null)}>Close</Button></DialogActions>

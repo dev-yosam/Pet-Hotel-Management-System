@@ -32,6 +32,8 @@ function OwnerInformation({ onOwnerChange }: OwnerInformationProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [refresh, setRefresh] = useState(0)
+  const [fieldErrors, setFieldErrors] = useState({ fullName: '', phone: '' })
 
   useEffect(() => {
     let active = true
@@ -56,7 +58,7 @@ function OwnerInformation({ onOwnerChange }: OwnerInformationProps) {
     return () => {
       active = false
     }
-  }, [])
+  }, [refresh])
 
   function selectOwner(value: string) {
     const owner = owners.find(item => String(item.id) === value)
@@ -68,6 +70,7 @@ function OwnerInformation({ onOwnerChange }: OwnerInformationProps) {
     setEmail(owner?.email ?? '')
     setError('')
     setSuccess('')
+    setFieldErrors({ fullName: '', phone: '' })
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -75,10 +78,16 @@ function OwnerInformation({ onOwnerChange }: OwnerInformationProps) {
     setError('')
     setSuccess('')
 
-    if (!fullName.trim() || !phone.trim()) {
-      setError('Name and phone must not be blank.')
-      return
+    const name = fullName.trim()
+    const phoneNumber = phone.trim()
+    const errors = {
+      fullName: !name || name.length > 100 || !/^(?=.*\p{L})[\p{L}\p{M} .'’-]+$/u.test(name)
+        ? 'Enter a name using letters, spaces, periods, apostrophes or hyphens. Numbers are not allowed.' : '',
+      phone: !phoneNumber || phoneNumber.length > 30 || !/^(?=.*[0-9])\+?[0-9 ()-]+$/.test(phoneNumber)
+        ? 'Enter a phone number using digits, a leading +, spaces, parentheses or hyphens.' : '',
     }
+    setFieldErrors(errors)
+    if (errors.fullName || errors.phone) return
 
     setSaving(true)
 
@@ -114,12 +123,16 @@ function OwnerInformation({ onOwnerChange }: OwnerInformationProps) {
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-      <Stack component="form" spacing={2} onSubmit={handleSubmit}>
+      <Stack component="form" noValidate spacing={2} onSubmit={handleSubmit}>
         <Typography variant="h6" component="h2">
           Owner Information
         </Typography>
 
-        {error && <Alert severity="error">{error}</Alert>}
+        {error && <Alert severity="error" action={<Button color="inherit" disabled={disabled} onClick={() => {
+          setError('')
+          setLoading(true)
+          setRefresh(value => value + 1)
+        }}>Retry</Button>}>{error}</Alert>}
         {success && <Alert severity="success">{success}</Alert>}
 
         <TextField
@@ -143,6 +156,8 @@ function OwnerInformation({ onOwnerChange }: OwnerInformationProps) {
 
         <TextField
           label="Full name"
+          error={Boolean(fieldErrors.fullName)}
+          helperText={fieldErrors.fullName}
           value={fullName}
           onChange={event => setFullName(event.target.value)}
           slotProps={{ htmlInput: { maxLength: 100 } }}
@@ -154,6 +169,8 @@ function OwnerInformation({ onOwnerChange }: OwnerInformationProps) {
 
         <TextField
           label="Phone"
+          error={Boolean(fieldErrors.phone)}
+          helperText={fieldErrors.phone}
           type="tel"
           value={phone}
           onChange={event => setPhone(event.target.value)}

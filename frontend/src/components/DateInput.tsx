@@ -4,6 +4,11 @@ import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { enUS } from '@mui/x-date-pickers/locales'
+import { useState, type FocusEvent } from 'react'
+import utc from 'dayjs/plugin/utc'
+import { Temporal } from '@js-temporal/polyfill'
+
+dayjs.extend(utc)
 
 interface Props {
   label: string
@@ -17,16 +22,41 @@ interface Props {
 }
 
 export default function DateInput({ label, value, onChange, withTime = false, disabled, required, error, helperText }: Props) {
-  // Keep the entered date and time unchanged. The form handles timezone conversion.
+  const [input, setInput] = useState({ external: value, date: value ? dayjs.utc(value) : null, version: 0 })
+  if (value !== input.external) {
+    setInput({ external: value, date: value ? dayjs.utc(value) : null, version: input.version + 1 })
+  }
+  const format = withTime ? 'YYYY-MM-DDTHH:mm' : 'YYYY-MM-DD'
+  const invalid = input.external === 'Invalid Date' || Boolean(input.date && !input.date.isValid())
+  function validateSections(event: FocusEvent<HTMLDivElement>) {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+    const sections = [...event.currentTarget.querySelectorAll('[role="spinbutton"]')]
+    const filled = sections.filter(section => section.hasAttribute('aria-valuenow')).length
+    // A partly entered optional date must not be treated as an empty filter.
+    if (filled > 0 && filled < sections.length) {
+      setInput(current => ({ ...current, external: 'Invalid Date' }))
+      onChange('Invalid Date')
+    } else if (filled === 0 && input.external === 'Invalid Date') {
+      setInput(current => ({ ...current, external: '', date: null }))
+      onChange('')
+    }
+  }
+  // Use neutral dates so the computer's timezone cannot change the entered time.
   const props = {
     label,
-    value: value ? dayjs(value) : null,
-    onChange: (date: dayjs.Dayjs | null) => onChange(date ? date.format(withTime ? 'YYYY-MM-DDTHH:mm' : 'YYYY-MM-DD') : ''),
+    value: input.date,
+    onChange: (date: dayjs.Dayjs | null) => {
+      const external = date ? date.format(format) : ''
+      setInput(current => ({ ...current, external, date }))
+      onChange(external)
+    },
+    timezone: 'UTC',
+    referenceDate: dayjs.utc(Temporal.Now.zonedDateTimeISO('Australia/Sydney').toPlainDateTime().toString()),
     disabled,
-    maxDate: dayjs('9998-12-31'),
+    maxDate: dayjs.utc('9998-12-31'),
     slotProps: {
-      textField: { fullWidth: true, required, helperText, ...(error ? { error: true } : {}) },
-      actionBar: { actions: ['clear', 'today', 'cancel', 'accept'] as ('clear' | 'today' | 'cancel' | 'accept')[] },
+      textField: { fullWidth: true, required, onBlur: validateSections, helperText: invalid ? 'Enter a valid date and time.' : (helperText || ' '), ...((error || invalid) ? { error: true } : {}) },
+      actionBar: { actions: ['clear', 'cancel', 'accept'] as ('clear' | 'cancel' | 'accept')[] },
       day: { sx: { borderRadius: 0 } },
     },
   }
@@ -34,8 +64,8 @@ export default function DateInput({ label, value, onChange, withTime = false, di
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en" localeText={enUS.components.MuiLocalizationProvider.defaultProps.localeText}>
       {withTime
-        ? <DateTimePicker {...props} format="DD/MM/YYYY HH:mm" ampm={false} />
-        : <DatePicker {...props} format="DD/MM/YYYY" />}
+        ? <DateTimePicker key={input.version} {...props} format="DD/MM/YYYY HH:mm" ampm={false} />
+        : <DatePicker key={input.version} {...props} format="DD/MM/YYYY" />}
     </LocalizationProvider>
   )
 }

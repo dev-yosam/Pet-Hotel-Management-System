@@ -1,5 +1,6 @@
 ﻿import DateInput from '../../components/DateInput'
 import { useState } from 'react'
+import { sydneyTimeToUtc } from '../../services/bookingTime'
 import type { FormEvent } from 'react'
 import { Button, Paper, Stack, TextField, Typography } from '@mui/material'
 import type { CareStay, CreateCareTask } from '../../types/care'
@@ -18,22 +19,25 @@ function CareTaskForm({ stay, disabled, onCreate }: Props) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const text = description.trim()
-    const date = new Date(scheduledAt)
+    let date = new Date(NaN)
     const nextErrors = { description: '', scheduledAt: '' }
+    try {
+      date = new Date(sydneyTimeToUtc(scheduledAt))
+    } catch {
+      nextErrors.scheduledAt = 'Enter a valid Sydney date and time. Avoid the repeated or skipped daylight saving hour.'
+    }
 
     if (!text || text.length > 500) {
       nextErrors.description = 'Enter 1 to 500 characters.'
     }
-    if (!scheduledAt || Number.isNaN(date.getTime())) {
-      nextErrors.scheduledAt = 'Choose a valid date and time.'
-    } else if (!stay.actualCheckIn || date < new Date(stay.actualCheckIn) ||
-        date >= new Date(stay.scheduledCheckOut)) {
+    if (!nextErrors.scheduledAt && (!stay.actualCheckIn || date < new Date(stay.actualCheckIn) ||
+        date >= new Date(stay.scheduledCheckOut))) {
       nextErrors.scheduledAt = 'Choose a time on or after check-in and before planned check-out.'
     }
     setErrors(nextErrors)
     if (nextErrors.description || nextErrors.scheduledAt || disabled) return
 
-    // Convert local input to UTC before sending it to the API.
+    // Send Sydney input as UTC.
     if (await onCreate({ description: text, scheduledAt: date.toISOString() })) {
       setDescription('')
       setScheduledAt('')
@@ -52,10 +56,10 @@ function CareTaskForm({ stay, disabled, onCreate }: Props) {
           slotProps={{ htmlInput: { maxLength: 500 } }}
         />
         <DateInput
-          label="Scheduled time" withTime required
+          label="Scheduled time (Sydney)" withTime required
           value={scheduledAt} onChange={setScheduledAt}
           disabled={disabled} error={Boolean(errors.scheduledAt)}
-          helperText={errors.scheduledAt || `Local time: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`}
+          helperText={errors.scheduledAt || 'Australia/Sydney'}
         />
         <Button type="submit" variant="contained" disabled={disabled} sx={{ alignSelf: 'flex-start' }}>
           Add task

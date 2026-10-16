@@ -1,5 +1,7 @@
 ﻿import DateInput from '../../components/DateInput'
 import { useState } from 'react'
+import StayActions from '../../components/StayActions'
+import { Link } from 'react-router'
 import type { FormEvent } from 'react'
 import {
   Alert,
@@ -136,7 +138,7 @@ function RoomBooking({ pet }: RoomBookingProps) {
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-      <Stack component="form" spacing={2} onSubmit={handleSubmit}>
+      <Stack component="form" noValidate spacing={2} onSubmit={handleSubmit}>
         <Typography variant="h6" component="h2">
           Room Booking
         </Typography>
@@ -153,12 +155,15 @@ function RoomBooking({ pet }: RoomBookingProps) {
 
         {booking && (
           <Alert severity="success">
-            Booking #{booking.id} created. Status: {booking.status}.
+            Stay #{booking.id}. Status: {booking.status}.
             {' '}Check-in: {formatSydneyTime(booking.scheduledCheckIn)}.
             {' '}Check-out: {formatSydneyTime(booking.scheduledCheckOut)}.
             {' '}Sydney time.
           </Alert>
         )}
+
+        {booking && <StayActions key={booking.id} stayId={booking.id} status={booking.status} onChanged={setBooking} />}
+        <Button component={Link} to="/stay-history" sx={{ alignSelf: 'flex-start' }}>Find an existing booking or stay</Button>
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <DateInput
