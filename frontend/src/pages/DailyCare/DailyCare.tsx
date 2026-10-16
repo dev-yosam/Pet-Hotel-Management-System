@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from 'react'
+import { getErrorMessage } from '../../services/apiErrors'
+import { useEffect, useState } from 'react'
 import {
   Alert, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogContentText, DialogTitle, FormControlLabel, MenuItem, Paper, Stack, TextField, Typography,
@@ -7,22 +8,10 @@ import { ApiError } from '../../services/apiClient'
 import { createCareTask, deleteCareTask, getCareStays, getCareTasks, updateCareCompletion } from '../../services/careService'
 import type { CareStay, CareTask } from '../../types/care'
 import CareTaskForm from './CareTaskForm'
-
-function errorMessage(error: unknown) {
-  if (error instanceof ApiError) {
-    const details = error.details
-    if (details && typeof details === 'object' && 'errors' in details &&
-        details.errors && typeof details.errors === 'object') {
-      const messages = Object.values(details.errors).flat().filter((value) => typeof value === 'string')
-      if (messages.length) return messages.join(' ')
-    }
-    return error.message
-  }
-  return 'Could not reach the server. Check the connection and try again.'
-}
+import { formatSydneyTime } from '../../services/bookingTime'
 
 function formatTime(value: string) {
-  return new Date(value).toLocaleString('en-AU')
+  return formatSydneyTime(value)
 }
 
 function DailyCare() {
@@ -50,7 +39,7 @@ function DailyCare() {
           setStays([])
           setStayId('')
           setLoadingTasks(false)
-          setError(errorMessage(reason))
+          setError(getErrorMessage(reason))
         }
       })
       .finally(() => {
@@ -67,7 +56,7 @@ function DailyCare() {
     getCareTasks(stayId, controller.signal)
       .then(setTasks)
       .catch((reason: unknown) => {
-        if (!controller.signal.aborted) setError(errorMessage(reason))
+        if (!controller.signal.aborted) setError(getErrorMessage(reason))
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoadingTasks(false)
@@ -100,7 +89,7 @@ function DailyCare() {
       return true
     } catch (reason) {
       setDeleteTarget(null)
-      setError(errorMessage(reason))
+      setError(getErrorMessage(reason))
       // Reload the stay when another user has changed its status.
       if (reason instanceof ApiError && (reason.status === 409 || reason.status === 404)) reload()
       return false
@@ -137,7 +126,7 @@ function DailyCare() {
         <MenuItem value="">Select a stay</MenuItem>
         {stays.map((stay) => (
           <MenuItem key={stay.id} value={stay.id} sx={{ whiteSpace: 'normal' }}>
-            {stay.petName} ? {stay.ownerName} ? Room {stay.roomNumber} ? {stay.status} ? Stay #{stay.id}
+            {stay.petName} / {stay.ownerName} / Room {stay.roomNumber} / {stay.status} / Stay #{stay.id}
           </MenuItem>
         ))}
       </TextField>
@@ -156,7 +145,7 @@ function DailyCare() {
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Stack spacing={1}>
               <Typography variant="h6" component="h2">{selectedStay.petName}</Typography>
-              <Typography>Owner: {selectedStay.ownerName} ? Room: {selectedStay.roomNumber}</Typography>
+              <Typography sx={{ overflowWrap: 'anywhere' }}>Owner: {selectedStay.ownerName} / Room: {selectedStay.roomNumber}</Typography>
               <Typography>Check-in: {selectedStay.actualCheckIn ? formatTime(selectedStay.actualCheckIn) : 'Not recorded'}</Typography>
               <Typography>Planned check-out: {formatTime(selectedStay.scheduledCheckOut)}</Typography>
               <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>

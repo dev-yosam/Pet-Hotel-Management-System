@@ -38,6 +38,7 @@ function PetRegistration({
   const [loadFailed, setLoadFailed] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [refresh, setRefresh] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -63,7 +64,7 @@ function PetRegistration({
     return () => {
       active = false
     }
-  }, [owner.id])
+  }, [owner.id, refresh])
 
   function selectPet(value: string) {
     const pet = pets.find(item => String(item.id) === value)
@@ -125,7 +126,7 @@ function PetRegistration({
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-      <Stack component="form" spacing={2} onSubmit={handleSubmit}>
+      <Stack component="form" noValidate spacing={2} onSubmit={handleSubmit}>
         <Typography variant="h6" component="h2">
           Pet Registration
         </Typography>
@@ -134,7 +135,12 @@ function PetRegistration({
           Owner: {owner.fullName} — {owner.phone}
         </Typography>
 
-        {error && <Alert severity="error">{error}</Alert>}
+        {error && <Alert severity="error" action={loadFailed ? <Button color="inherit" disabled={loading} onClick={() => {
+          setError('')
+          setLoadFailed(false)
+          setLoading(true)
+          setRefresh(value => value + 1)
+        }}>Retry</Button> : undefined}>{error}</Alert>}
         {success && <Alert severity="success">{success}</Alert>}
 
         <TextField

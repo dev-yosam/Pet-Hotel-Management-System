@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import { Alert, Box, Button, LinearProgress, Paper, Stack, Typography } from '@mui/material'
 import { getDashboardSummary, type DashboardSummary } from '../../services/dashboardService'
+import { getErrorMessage } from '../../services/apiErrors'
 
 function Dashboard() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
@@ -21,7 +22,7 @@ function Dashboard() {
       .then(data => { if (!controller.signal.aborted) setSummary(data) })
       .catch((reason: unknown) => {
         if (!controller.signal.aborted) {
-          setError(reason instanceof Error ? reason.message : 'Unable to load dashboard.')
+          setError(getErrorMessage(reason))
         }
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
