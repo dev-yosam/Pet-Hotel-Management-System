@@ -3,6 +3,7 @@ using PetHotel.Api.Data;
 using PetHotel.Api.DTOs;
 using PetHotel.Api.Interfaces;
 using PetHotel.Api.Models;
+using System.Data;
 
 namespace PetHotel.Api.Services;
 
@@ -18,9 +19,14 @@ public class CareService(PetHotelDbContext db) : ICareService
             .ThenByDescending(stay => stay.ScheduledCheckIn)
             .Select(stay => new
             {
-                stay.Id, PetName = stay.Pet.Name, OwnerName = stay.Pet.Owner.FullName,
-                stay.Room.RoomNumber, stay.Status, stay.ActualCheckIn,
-                stay.ScheduledCheckOut, stay.Pet.CareInstructions
+                stay.Id,
+                PetName = stay.Pet.Name,
+                OwnerName = stay.Pet.Owner.FullName,
+                stay.Room.RoomNumber,
+                stay.Status,
+                stay.ActualCheckIn,
+                stay.ScheduledCheckOut,
+                stay.Pet.CareInstructions
             })
             .ToListAsync(cancellationToken);
 
@@ -50,71 +56,172 @@ public class CareService(PetHotelDbContext db) : ICareService
         return ToDto(record);
     }
 
-    public async Task<CareTaskDto> CreateTaskAsync(int stayId, CreateCareTaskRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<CareTaskDto> CreateTaskAsync(
+    int stayId,
+    CreateCareTaskRequest request,
+    CancellationToken cancellationToken = default)
     {
-        var stay = await db.Stays.SingleOrDefaultAsync(stay => stay.Id == stayId, cancellationToken)
-            ?? throw new CareException(CareError.NotFound, "Stay not found.");
+        await using var transaction =
+            await db.Database.BeginTransactionAsync(
+                IsolationLevel.ReadCommitted,
+                cancellationToken);
 
-        // Only checked-in stays can have new care tasks.
+        var stay = await LockStayAsync(stayId, cancellationToken);
         RequireCheckedIn(stay);
+
         var description = request.Description?.Trim();
+
         if (string.IsNullOrEmpty(description) || description.Length > 500)
-            throw new CareException(CareError.InvalidInput, "Description must contain 1 to 500 characters.");
+            throw new CareException(
+                CareError.InvalidInput,
+                "Description must contain 1 to 500 characters.");
+
         if (request.ScheduledAt is null)
-            throw new CareException(CareError.InvalidInput, "Scheduled time is required.");
+            throw new CareException(
+                CareError.InvalidInput,
+                "Scheduled time is required.");
+
         if (stay.ActualCheckIn is null)
-            throw new CareException(CareError.Conflict, "This stay has no actual check-in time.");
+            throw new CareException(
+                CareError.Conflict,
+                "This stay has no actual check-in time.");
 
         var scheduledAt = request.ScheduledAt.Value.ToUniversalTime();
-        // Care must be scheduled during the stay.
-        if (scheduledAt < stay.ActualCheckIn.Value || scheduledAt >= stay.ScheduledCheckOut)
-            throw new CareException(CareError.InvalidInput,
+
+        if (scheduledAt < stay.ActualCheckIn.Value ||
+            scheduledAt >= stay.ScheduledCheckOut)
+            throw new CareException(
+                CareError.InvalidInput,
                 "Scheduled time must be on or after check-in and before the planned check-out.");
 
-        var record = new CareRecord { StayId = stayId, Description = description, ScheduledAt = scheduledAt };
+        var record = new CareRecord
+        {
+            StayId = stayId,
+            Description = description,
+            ScheduledAt = scheduledAt
+        };
+
         db.CareRecords.Add(record);
         await db.SaveChangesAsync(cancellationToken);
         await db.Entry(record).ReloadAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
         return ToDto(record);
     }
 
-    public async Task<CareTaskDto> UpdateCompletionAsync(int taskId, bool isCompleted,
-        CancellationToken cancellationToken = default)
+    public async Task<CareTaskDto> UpdateCompletionAsync(
+    int taskId,
+    bool isCompleted,
+    CancellationToken cancellationToken = default)
     {
+        await using var transaction =
+            await db.Database.BeginTransactionAsync(
+                IsolationLevel.ReadCommitted,
+                cancellationToken);
+
         var record = await FindTaskWithStayAsync(taskId, cancellationToken);
         RequireCheckedIn(record.Stay);
 
-        // Keep the first completion time when the same request is sent again.
+        // Repeated requests preserve the first completion timestamp.
         if (record.IsCompleted != isCompleted)
         {
             record.IsCompleted = isCompleted;
             record.CompletedAt = isCompleted ? DateTimeOffset.UtcNow : null;
+
             await db.SaveChangesAsync(cancellationToken);
-            // Return the timestamp stored by the database.
             await db.Entry(record).ReloadAsync(cancellationToken);
         }
+
+        await transaction.CommitAsync(cancellationToken);
+
         return ToDto(record);
     }
 
-    public async Task DeleteTaskAsync(int taskId, CancellationToken cancellationToken = default)
+    public async Task DeleteTaskAsync(
+    int taskId,
+    CancellationToken cancellationToken = default)
     {
+        await using var transaction =
+            await db.Database.BeginTransactionAsync(
+                IsolationLevel.ReadCommitted,
+                cancellationToken);
+
         var record = await FindTaskWithStayAsync(taskId, cancellationToken);
         RequireCheckedIn(record.Stay);
 
-        // Only unfinished care tasks can be deleted.
         if (record.IsCompleted)
-            throw new CareException(CareError.Conflict, "Completed care tasks cannot be deleted.");
+            throw new CareException(
+                CareError.Conflict,
+                "Completed care tasks cannot be deleted.");
 
         db.CareRecords.Remove(record);
         await db.SaveChangesAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
-    private async Task<CareRecord> FindTaskWithStayAsync(int taskId, CancellationToken cancellationToken)
+    private async Task<Stay> LockStayAsync(
+     int stayId,
+     CancellationToken cancellationToken)
     {
-        return await db.CareRecords.Include(record => record.Stay)
-            .SingleOrDefaultAsync(record => record.Id == taskId, cancellationToken)
-            ?? throw new CareException(CareError.NotFound, "Care task not found.");
+        var stays = await db.Stays
+            .FromSqlInterpolated(
+                $"""SELECT * FROM "Stays" WHERE "Id" = {stayId} FOR UPDATE""")
+            .ToListAsync(cancellationToken);
+
+        var stay = stays.SingleOrDefault()
+            ?? throw new CareException(
+                CareError.NotFound,
+                "Stay not found.");
+
+        // Refresh entities that this context may already be tracking.
+        await db.Entry(stay).ReloadAsync(cancellationToken);
+
+        return stay;
+    }
+
+    private async Task<CareRecord> FindTaskWithStayAsync(
+        int taskId,
+        CancellationToken cancellationToken)
+    {
+        var stayId = await db.CareRecords
+            .AsNoTracking()
+            .Where(record => record.Id == taskId)
+            .Select(record => (int?)record.StayId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (stayId is null)
+            throw new CareException(
+                CareError.NotFound,
+                "Care task not found.");
+
+        // Lock the stay before reading the task's current state.
+        var stay = await LockStayAsync(stayId.Value, cancellationToken);
+
+        var record = await db.CareRecords
+            .SingleOrDefaultAsync(
+                record => record.Id == taskId,
+                cancellationToken)
+            ?? throw new CareException(
+                CareError.NotFound,
+                "Care task not found.");
+
+        await db.Entry(record).ReloadAsync(cancellationToken);
+
+        if (db.Entry(record).State == EntityState.Detached)
+            throw new CareException(
+                CareError.NotFound,
+                "Care task not found.");
+
+        if (record.StayId != stay.Id)
+            throw new CareException(
+                CareError.Conflict,
+                "The care task has changed. Refresh and try again.");
+
+        record.Stay = stay;
+
+        return record;
     }
 
     private static void RequireCheckedIn(Stay stay)
