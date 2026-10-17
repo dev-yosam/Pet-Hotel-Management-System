@@ -20,6 +20,14 @@ public class OwnerRequestTests
     }
 
     [TestCase("rewrew", false)]
+    [TestCase("1", false)]
+    [TestCase("123456", false)]
+    [TestCase("1234567", true)]
+    [TestCase("123456789012345", true)]
+    [TestCase("1234567890123456", false)]
+    [TestCase("(0412345678", false)]
+    [TestCase("0412)345678(", false)]
+    [TestCase("0412--345678", false)]
     [TestCase("0412abc678", false)]
     [TestCase("+ ()-", false)]
     [TestCase("04+12345678", false)]
@@ -67,7 +75,7 @@ public class OwnerRequestTests
         Assert.That(IsValid(request), Is.EqualTo(expected));
     }
 
-    [TestCase(30, true)]
+    [TestCase(30, false)]
     [TestCase(31, false)]
     public void Phone_LengthBoundary_ReturnsExpectedResult(
         int length,
@@ -82,6 +90,14 @@ public class OwnerRequestTests
     [TestCase(null, true)]
     [TestCase("alan@example.com", true)]
     [TestCase("invalid-email", false)]
+    [TestCase("a@@example.com", false)]
+    [TestCase("a b@example.com", false)]
+    [TestCase("a@example", false)]
+    [TestCase(".a@example.com", false)]
+    [TestCase("a..b@example.com", false)]
+    [TestCase("a@-example.com", false)]
+    [TestCase("a@exam_ple.com", false)]
+    [TestCase("sam.lee+hotel@example.com", true)]
     public void Email_Format_ReturnsExpectedResult(
         string? email,
         bool expected)
@@ -99,7 +115,8 @@ public class OwnerRequestTests
         bool expected)
     {
         var request = CreateValidRequest();
-        request.Email = new string('a', length - 12) + "@example.com";
+        request.Email = new string('a', 64) + "@" + new string('b', 63) + "." +
+            new string('c', 63) + "." + new string('d', length - 197) + ".com";
 
         Assert.That(IsValid(request), Is.EqualTo(expected));
     }

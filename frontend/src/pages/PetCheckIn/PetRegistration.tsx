@@ -1,3 +1,4 @@
+import { validatePet } from '../../services/inputValidation'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
@@ -39,6 +40,7 @@ function PetRegistration({
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [refresh, setRefresh] = useState(0)
+  const [fieldErrors, setFieldErrors] = useState({ name: '', species: '', breed: '', careInstructions: '' })
 
   useEffect(() => {
     let active = true
@@ -77,17 +79,18 @@ function PetRegistration({
     setCareInstructions(pet?.careInstructions ?? '')
     setError('')
     setSuccess('')
+    setFieldErrors({ name: '', species: '', breed: '', careInstructions: '' })
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
     setSuccess('')
+    setFieldErrors({ name: '', species: '', breed: '', careInstructions: '' })
 
-    if (!name.trim() || !species.trim()) {
-      setError('Pet name and species must not be blank.')
-      return
-    }
+    const errors = validatePet(name.trim(), species.trim(), breed.trim(), careInstructions.trim())
+    setFieldErrors(errors)
+    if (Object.values(errors).some(Boolean)) return
 
     setSaving(true)
 
@@ -164,6 +167,8 @@ function PetRegistration({
 
         <TextField
           label="Pet name"
+          error={Boolean(fieldErrors.name)}
+          helperText={fieldErrors.name}
           value={name}
           onChange={event => setName(event.target.value)}
           slotProps={{ htmlInput: { maxLength: 100 } }}
@@ -174,10 +179,12 @@ function PetRegistration({
 
         <TextField
           label="Species"
+          error={Boolean(fieldErrors.species)}
+          helperText={fieldErrors.species}
           value={species}
           onChange={event => setSpecies(event.target.value)}
           slotProps={{ htmlInput: { maxLength: 50 } }}
-          helperText="For example, Dog or Cat."
+
           disabled={disabled}
           required
           fullWidth
@@ -185,6 +192,8 @@ function PetRegistration({
 
         <TextField
           label="Breed"
+          error={Boolean(fieldErrors.breed)}
+          helperText={fieldErrors.breed}
           value={breed}
           onChange={event => setBreed(event.target.value)}
           slotProps={{ htmlInput: { maxLength: 100 } }}
@@ -194,6 +203,8 @@ function PetRegistration({
 
         <TextField
           label="Care instructions"
+          error={Boolean(fieldErrors.careInstructions)}
+          helperText={fieldErrors.careInstructions}
           value={careInstructions}
           onChange={event => setCareInstructions(event.target.value)}
           slotProps={{ htmlInput: { maxLength: 1000 } }}

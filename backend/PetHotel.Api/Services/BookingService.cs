@@ -43,13 +43,21 @@ public class BookingService(PetHotelDbContext dbContext) : IBookingService
 
         var checkIn = request.ScheduledCheckIn!.Value.ToUniversalTime();
         var checkOut = request.ScheduledCheckOut!.Value.ToUniversalTime();
+        if (checkOut <= DateTimeOffset.UtcNow)
+            throw new BookingException(BookingError.InvalidInput, "Check-out must be in the future.");
 
         await using var transaction =
             await dbContext.Database.BeginTransactionAsync(
                 IsolationLevel.ReadCommitted,
                 cancellationToken);
 
-        // All booking creation must lock the room before checking conflicts.
+        // Lock the pet first so concurrent bookings cannot use different rooms for one pet.
+        var pets = await dbContext.Pets
+            .FromSqlInterpolated($"SELECT * FROM \"Pets\" WHERE \"Id\" = {request.PetId} FOR UPDATE")
+            .AsNoTracking().ToListAsync(cancellationToken);
+        if (pets.Count == 0)
+            throw new BookingException(BookingError.NotFound, "Pet not found.");
+
         var rooms = await dbContext.Rooms
             .FromSqlInterpolated(
                 $"""SELECT * FROM "Rooms" WHERE "Id" = {request.RoomId} FOR UPDATE""")
@@ -72,15 +80,14 @@ public class BookingService(PetHotelDbContext dbContext) : IBookingService
                 "The selected room is inactive.");
         }
 
-        var petExists = await dbContext.Pets.AnyAsync(
-            pet => pet.Id == request.PetId,
+        var petConflict = await dbContext.Stays.AnyAsync(
+            stay => stay.PetId == request.PetId &&
+                (stay.Status == StayStatus.Booked || stay.Status == StayStatus.CheckedIn) &&
+                stay.ScheduledCheckIn < checkOut && stay.ScheduledCheckOut > checkIn,
             cancellationToken);
-
-        if (!petExists)
+        if (petConflict)
         {
-            throw new BookingException(
-                BookingError.NotFound,
-                "Pet not found.");
+            throw new BookingException(BookingError.Conflict, "This pet already has a stay for these dates.");
         }
 
         var hasConflict = await dbContext.Stays.AnyAsync(

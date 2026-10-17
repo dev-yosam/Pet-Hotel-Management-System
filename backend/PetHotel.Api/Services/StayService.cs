@@ -41,23 +41,27 @@ public class StayService(
                 IsolationLevel.ReadCommitted,
                 cancellationToken);
 
-        var roomId = await dbContext.Stays
+        var stayInfo = await dbContext.Stays
             .AsNoTracking()
             .Where(stay => stay.Id == id)
-            .Select(stay => (int?)stay.RoomId)
+            .Select(stay => new { stay.RoomId, stay.PetId })
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (roomId is null)
+        if (stayInfo is null)
         {
             throw new StayException(
                 StayError.NotFound,
                 "Stay not found.");
         }
 
-        // Lock the room before the stay, using the booking lock order.
+        // Keep the same pet, room, stay lock order as booking.
+        await dbContext.Pets
+            .FromSqlInterpolated($"""SELECT * FROM "Pets" WHERE "Id" = {stayInfo.PetId} FOR UPDATE""")
+            .AsNoTracking().ToListAsync(cancellationToken);
+
         var rooms = await dbContext.Rooms
             .FromSqlInterpolated(
-                $"""SELECT * FROM "Rooms" WHERE "Id" = {roomId.Value} FOR UPDATE""")
+                $"""SELECT * FROM "Rooms" WHERE "Id" = {stayInfo.RoomId} FOR UPDATE""")
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
@@ -120,6 +124,12 @@ public class StayService(
                 "Check-in is only allowed during the booked period.");
         }
 
+        // A pet must check out before checking into another room.
+        if (await dbContext.Stays.AnyAsync(other => other.Id != stay.Id &&
+            other.PetId == stay.PetId && other.Status == StayStatus.CheckedIn &&
+            other.ActualCheckOut == null, cancellationToken))
+            throw new StayException(StayError.Conflict, "This pet is already checked in.");
+
         var roomOccupied = await dbContext.Stays.AnyAsync(
             other =>
                 other.Id != stay.Id &&
@@ -162,13 +172,13 @@ public class StayService(
                 IsolationLevel.ReadCommitted,
                 cancellationToken);
 
-        var roomId = await dbContext.Stays
+        var stayInfo = await dbContext.Stays
             .AsNoTracking()
             .Where(stay => stay.Id == id)
-            .Select(stay => (int?)stay.RoomId)
+            .Select(stay => new { stay.RoomId, stay.PetId })
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (roomId is null)
+        if (stayInfo is null)
         {
             throw new StayException(
                 StayError.NotFound,
@@ -176,9 +186,14 @@ public class StayService(
         }
 
         // Use the same lock order as check-in.
+        // Keep the same pet, room, stay lock order as booking.
+        await dbContext.Pets
+            .FromSqlInterpolated($"""SELECT * FROM "Pets" WHERE "Id" = {stayInfo.PetId} FOR UPDATE""")
+            .AsNoTracking().ToListAsync(cancellationToken);
+
         var rooms = await dbContext.Rooms
             .FromSqlInterpolated(
-                $"""SELECT * FROM "Rooms" WHERE "Id" = {roomId.Value} FOR UPDATE""")
+                $"""SELECT * FROM "Rooms" WHERE "Id" = {stayInfo.RoomId} FOR UPDATE""")
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 

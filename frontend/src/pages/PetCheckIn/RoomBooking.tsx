@@ -66,6 +66,9 @@ function RoomBooking({ pet }: RoomBookingProps) {
     if (new Date(end).getTime() <= new Date(start).getTime()) {
       throw new Error('Check-out must be after check-in.')
     }
+    if (new Date(end).getTime() <= Date.now()) {
+      throw new Error('Check-out must be in the future.')
+    }
 
     return { start, end }
   }
