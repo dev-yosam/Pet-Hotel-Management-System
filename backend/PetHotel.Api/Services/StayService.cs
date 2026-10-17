@@ -185,8 +185,7 @@ public class StayService(
                 "Stay not found.");
         }
 
-        // Use the same lock order as check-in.
-        // Keep the same pet, room, stay lock order as booking.
+        // Use the same lock order so requests do not block each other in reverse order.
         await dbContext.Pets
             .FromSqlInterpolated($"""SELECT * FROM "Pets" WHERE "Id" = {stayInfo.PetId} FOR UPDATE""")
             .AsNoTracking().ToListAsync(cancellationToken);

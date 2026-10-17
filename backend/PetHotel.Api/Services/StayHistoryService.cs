@@ -45,6 +45,7 @@ public class StayHistoryService(PetHotelDbContext db) : IStayHistoryService
             stays = stays.Where(stay => stay.ScheduledCheckIn < end);
         }
         var total = await stays.CountAsync(cancellationToken);
+        // Use the ID to keep page order stable when names or dates are the same.
         var sorted = query.Sort switch
         {
             "oldest" => stays.OrderBy(stay => stay.ScheduledCheckIn).ThenBy(stay => stay.Id),

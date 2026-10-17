@@ -1,7 +1,11 @@
 ﻿import { useEffect, useState } from 'react'
-import { Alert, Box, Button, LinearProgress, Paper, Stack, Typography } from '@mui/material'
-import { getDashboardSummary, type DashboardSummary } from '../../services/dashboardService'
+import { Alert, Box, Button, LinearProgress, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material'
+import { getDashboardSummary, type DashboardSummary, type DashboardRoom } from '../../services/dashboardService'
 import { getErrorMessage } from '../../services/apiErrors'
+
+function roomStatus(room: DashboardRoom) {
+  return room.petName !== null ? 'Occupied' : room.isActive ? 'Available' : 'Inactive'
+}
 
 function Dashboard() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
@@ -75,6 +79,33 @@ function Dashboard() {
             </Stack>
           </Paper>
         </Box>
+        <Stack spacing={2}>
+          <Typography variant="h6" component="h2">Rooms</Typography>
+          <Typography color="text.secondary">Current occupancy. Future bookings are not shown here.</Typography>
+          <TableContainer component={Paper} variant="outlined" sx={{ display: { xs: 'none', sm: 'block' } }}>
+            <Table aria-label="Room occupancy" sx={{ tableLayout: 'fixed' }}>
+              <TableHead><TableRow>
+                {['Room', 'Type', 'Status', 'Pet'].map(label => <TableCell key={label}>{label}</TableCell>)}
+              </TableRow></TableHead>
+              <TableBody>
+                {summary.rooms.map(room => <TableRow key={room.id}>
+                  <TableCell component="th" scope="row">{room.roomNumber}</TableCell>
+                  <TableCell>{room.roomType}</TableCell>
+                  <TableCell>{roomStatus(room)}</TableCell>
+                  <TableCell sx={{ overflowWrap: 'anywhere' }}>{room.petName ?? '—'}</TableCell>
+                </TableRow>)}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Stack spacing={1} sx={{ display: { xs: 'flex', sm: 'none' } }}>
+            {summary.rooms.map(room => <Paper key={room.id} variant="outlined" sx={{ p: 2 }}>
+              <Typography component="h3">Room {room.roomNumber} · {room.roomType}</Typography>
+              <Typography>{roomStatus(room)}</Typography>
+              <Typography sx={{ overflowWrap: 'anywhere' }}>Pet: {room.petName ?? '—'}</Typography>
+            </Paper>)}
+          </Stack>
+          {summary.rooms.length === 0 && <Typography>No rooms found.</Typography>}
+        </Stack>
       </>}
     </Stack>
   )

@@ -11,6 +11,7 @@ export function getErrorMessage(error: unknown): string {
       details.errors &&
       typeof details.errors === 'object'
     ) {
+      // Show field errors from the API instead of only the general error title.
       const messages = Object.values(details.errors)
         .flatMap(value => Array.isArray(value) ? value : [])
         .filter((value): value is string => typeof value === 'string')

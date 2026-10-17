@@ -12,6 +12,15 @@ export interface DashboardSummary {
   completedCareTasks: number
   pendingCareTasks: number
   careCompletionPercent: number
+  rooms: DashboardRoom[]
+}
+
+export interface DashboardRoom {
+  id: number
+  roomNumber: string
+  roomType: string
+  isActive: boolean
+  petName: string | null
 }
 
 export function getDashboardSummary(signal?: AbortSignal): Promise<DashboardSummary> {
