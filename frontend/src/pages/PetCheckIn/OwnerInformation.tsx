@@ -1,3 +1,4 @@
+import { validateOwner } from '../../services/inputValidation'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
@@ -33,7 +34,7 @@ function OwnerInformation({ onOwnerChange }: OwnerInformationProps) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [refresh, setRefresh] = useState(0)
-  const [fieldErrors, setFieldErrors] = useState({ fullName: '', phone: '' })
+  const [fieldErrors, setFieldErrors] = useState({ fullName: '', phone: '', email: '' })
 
   useEffect(() => {
     let active = true
@@ -70,7 +71,7 @@ function OwnerInformation({ onOwnerChange }: OwnerInformationProps) {
     setEmail(owner?.email ?? '')
     setError('')
     setSuccess('')
-    setFieldErrors({ fullName: '', phone: '' })
+    setFieldErrors({ fullName: '', phone: '', email: '' })
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -80,14 +81,9 @@ function OwnerInformation({ onOwnerChange }: OwnerInformationProps) {
 
     const name = fullName.trim()
     const phoneNumber = phone.trim()
-    const errors = {
-      fullName: !name || name.length > 100 || !/^(?=.*\p{L})[\p{L}\p{M} .'’-]+$/u.test(name)
-        ? 'Enter a name using letters, spaces, periods, apostrophes or hyphens. Numbers are not allowed.' : '',
-      phone: !phoneNumber || phoneNumber.length > 30 || !/^(?=.*[0-9])\+?[0-9 ()-]+$/.test(phoneNumber)
-        ? 'Enter a phone number using digits, a leading +, spaces, parentheses or hyphens.' : '',
-    }
+    const errors = validateOwner(name, phoneNumber, email.trim())
     setFieldErrors(errors)
-    if (errors.fullName || errors.phone) return
+    if (Object.values(errors).some(Boolean)) return
 
     setSaving(true)
 
@@ -183,6 +179,8 @@ function OwnerInformation({ onOwnerChange }: OwnerInformationProps) {
 
         <TextField
           label="Email"
+          error={Boolean(fieldErrors.email)}
+          helperText={fieldErrors.email}
           type="email"
           value={email}
           onChange={event => setEmail(event.target.value)}

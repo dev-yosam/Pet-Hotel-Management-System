@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
 namespace PetHotel.Api.Services;
 
@@ -12,7 +13,12 @@ public class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : IExcepti
         var status = StatusCodes.Status500InternalServerError;
         var message = "The request could not be completed. Please try again.";
 
-        if (exception is CareException careException)
+        if (exception is ValidationException validationException)
+        {
+            status = StatusCodes.Status400BadRequest;
+            message = validationException.Message;
+        }
+        else if (exception is CareException careException)
         {
             status = careException.Error switch
             {

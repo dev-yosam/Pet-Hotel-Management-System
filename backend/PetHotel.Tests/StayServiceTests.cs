@@ -804,6 +804,47 @@ public class StayServiceTests
             Assert.That(saved.TotalCharge, Is.EqualTo(80m));
         });
     }
+    [Test]
+    public async Task SamePet_ConcurrentCheckInsInDifferentRooms_OnlyOneSucceeds()
+    {
+        var second = new Stay
+        {
+            PetId = petId,
+            Room = new Room { RoomNumber = Guid.NewGuid().ToString("N")[..12], RoomType = "Standard" },
+            ScheduledCheckIn = Now.AddHours(-1), ScheduledCheckOut = Now.AddDays(1)
+        };
+        dbContext.Stays.Add(second);
+        await dbContext.SaveChangesAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var start = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        async Task<bool> CheckIn(int id)
+        {
+            await using var context = new PetHotelDbContext(options);
+            await start.Task.WaitAsync(timeout.Token);
+            try
+            {
+                await new StayService(context, new FixedTimeProvider(Now), CreateChargeCalculator())
+                    .CheckInAsync(id, timeout.Token);
+                return true;
+            }
+            catch (StayException exception) when (exception.Error == StayError.Conflict) { return false; }
+        }
+        try
+        {
+            var first = CheckIn(stayId);
+            var other = CheckIn(second.Id);
+            start.SetResult(true);
+            Assert.That((await Task.WhenAll(first, other)).Count(success => success), Is.EqualTo(1));
+            Assert.That(await dbContext.Stays.CountAsync(stay => stay.PetId == petId &&
+                stay.Status == StayStatus.CheckedIn), Is.EqualTo(1));
+        }
+        finally
+        {
+            await dbContext.Stays.Where(stay => stay.Id == second.Id).ExecuteDeleteAsync();
+            await dbContext.Rooms.Where(room => room.Id == second.RoomId).ExecuteDeleteAsync();
+        }
+    }
+
     private sealed class FixedTimeProvider(
         DateTimeOffset utcNow) : TimeProvider
     {

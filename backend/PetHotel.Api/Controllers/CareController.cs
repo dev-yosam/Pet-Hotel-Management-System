@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using PetHotel.Api.DTOs;
 using PetHotel.Api.Interfaces;
@@ -13,15 +14,15 @@ public class CareController(ICareService careService) : ControllerBase
         Ok(await careService.GetStaysAsync(cancellationToken));
 
     [HttpGet("stays/{stayId:int}/tasks")]
-    public async Task<ActionResult<List<CareTaskDto>>> GetTasks(int stayId, CancellationToken cancellationToken) =>
+    public async Task<ActionResult<List<CareTaskDto>>> GetTasks([Range(1, int.MaxValue)] int stayId, CancellationToken cancellationToken) =>
         Ok(await careService.GetTasksAsync(stayId, cancellationToken));
 
     [HttpGet("tasks/{taskId:int}")]
-    public async Task<ActionResult<CareTaskDto>> GetTask(int taskId, CancellationToken cancellationToken) =>
+    public async Task<ActionResult<CareTaskDto>> GetTask([Range(1, int.MaxValue)] int taskId, CancellationToken cancellationToken) =>
         Ok(await careService.GetTaskAsync(taskId, cancellationToken));
 
     [HttpPost("stays/{stayId:int}/tasks")]
-    public async Task<ActionResult<CareTaskDto>> CreateTask(int stayId, CreateCareTaskRequest request,
+    public async Task<ActionResult<CareTaskDto>> CreateTask([Range(1, int.MaxValue)] int stayId, CreateCareTaskRequest request,
         CancellationToken cancellationToken)
     {
         var task = await careService.CreateTaskAsync(stayId, request, cancellationToken);
@@ -29,12 +30,12 @@ public class CareController(ICareService careService) : ControllerBase
     }
 
     [HttpPatch("tasks/{taskId:int}/completion")]
-    public async Task<ActionResult<CareTaskDto>> UpdateCompletion(int taskId, UpdateCareCompletionRequest request,
+    public async Task<ActionResult<CareTaskDto>> UpdateCompletion([Range(1, int.MaxValue)] int taskId, UpdateCareCompletionRequest request,
         CancellationToken cancellationToken) =>
         Ok(await careService.UpdateCompletionAsync(taskId, request.IsCompleted!.Value, cancellationToken));
 
     [HttpDelete("tasks/{taskId:int}")]
-    public async Task<IActionResult> DeleteTask(int taskId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeleteTask([Range(1, int.MaxValue)] int taskId, CancellationToken cancellationToken)
     {
         await careService.DeleteTaskAsync(taskId, cancellationToken);
         return NoContent();

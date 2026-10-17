@@ -11,6 +11,7 @@ public record CareStayDto(int Id, string PetName, string OwnerName, string RoomN
 public class CreateCareTaskRequest
 {
     [Required]
+    [StringLength(500)]
     public string Description { get; set; } = string.Empty;
 
     [Required]
