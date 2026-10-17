@@ -33,18 +33,13 @@ app.UseExceptionHandler();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+}
 
-    if (app.Configuration.GetValue<bool>("SeedDemoData"))
-    {
-        await using var scope = app.Services.CreateAsyncScope();
-
-        var db = scope.ServiceProvider
-            .GetRequiredService<PetHotelDbContext>();
-
-        await DemoDataSeeder.SeedAsync(db);
-
-        app.Logger.LogInformation("Demo room setup completed.");
-    }
+// Add the fixed rooms before accepting bookings.
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<PetHotelDbContext>();
+    await RoomSeeder.SeedAsync(db);
 }
 
 app.UseHttpsRedirection();

@@ -31,9 +31,17 @@ public class DashboardService(PetHotelDbContext db, TimeProvider timeProvider) :
         var todayCare = db.CareRecords.Where(record => record.ScheduledAt >= start && record.ScheduledAt < end);
         var careTasks = await todayCare.CountAsync(cancellationToken);
         var completed = await todayCare.CountAsync(record => record.IsCompleted, cancellationToken);
+        // Start with all rooms so empty rooms also appear on the dashboard.
+        var rooms = await db.Rooms.AsNoTracking().OrderBy(room => room.RoomNumber)
+            .Select(room => new DashboardRoom(room.Id, room.RoomNumber, room.RoomType, room.IsActive,
+                room.Stays.Where(stay => stay.Status == StayStatus.CheckedIn
+                    && stay.ActualCheckIn != null && stay.ActualCheckOut == null)
+                    .OrderByDescending(stay => stay.ActualCheckIn).ThenByDescending(stay => stay.Id)
+                    .Select(stay => stay.Pet.Name).FirstOrDefault()))
+            .ToListAsync(cancellationToken);
         return new DashboardSummary(DateOnly.FromDateTime(today), currentPets, activeRooms, occupiedRooms,
             Percentage(occupiedRooms, activeRooms), checkIns, checkOuts, careTasks, completed,
-            careTasks - completed, Percentage(completed, careTasks));
+            careTasks - completed, Percentage(completed, careTasks)) { Rooms = rooms };
     }
 
     private static decimal Percentage(int count, int total) =>

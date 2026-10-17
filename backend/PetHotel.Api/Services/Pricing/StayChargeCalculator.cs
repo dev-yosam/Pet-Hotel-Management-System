@@ -43,6 +43,7 @@ public class StayChargeCalculator(
             scheduledCheckOut,
             SydneyTimeZone);
 
+        // Charge by booked Sydney dates, with a minimum of one night.
         var startDate = DateOnly.FromDateTime(localCheckIn.DateTime);
         var endDate = DateOnly.FromDateTime(localCheckOut.DateTime);
         var nights = Math.Max(1, endDate.DayNumber - startDate.DayNumber);

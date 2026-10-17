@@ -37,16 +37,6 @@ You can also create an empty pet_hotel database in pgAdmin first.
 
 Start the backend
 
-For the first run, add the demo rooms:
-
-dotnet run --project backend/PetHotel.Api --launch-profile http -- --SeedDemoData=true
-
-This adds DEMO-101 (Standard) and DEMO-201 (Deluxe) if they are missing.
-It does not replace existing rooms or create owners and pets.
-The demo setup runs only in Development.
-
-For later runs:
-
 dotnet run --project backend/PetHotel.Api --launch-profile http
 
 The API runs at http://localhost:5041.
@@ -69,6 +59,8 @@ Using the app
 
 Open Pet Check-in and create an owner.
 Register a pet for that owner.
+The app has six Standard rooms (101-106) and six Deluxe rooms (201-206).
+Rooms are set up automatically when the backend starts.
 Choose planned arrival and departure times, then find an available room.
 Create the booking and click Check in when the booked period has started.
 For an immediate check-in, choose an arrival time a few minutes before now.
@@ -119,7 +111,7 @@ Common problems
 If the page reports a connection error, check that the API is running on port 5041.
 If database login fails, check your PostgreSQL service, username and password.
 If tables or columns are missing, run the database update command again.
-If no rooms are shown, run the demo room setup and check the booking dates.
+If no rooms are shown, restart the backend and check the booking dates.
 If a build says a file is in use, stop the running API with Ctrl+C and build again.
 After changing backend code, restart the API.
 If frontend packages change, run npm ci again.

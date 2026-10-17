@@ -80,6 +80,7 @@ public class BookingService(PetHotelDbContext dbContext) : IBookingService
                 "The selected room is inactive.");
         }
 
+        // One stay may start exactly when another ends, without a date overlap.
         var petConflict = await dbContext.Stays.AnyAsync(
             stay => stay.PetId == request.PetId &&
                 (stay.Status == StayStatus.Booked || stay.Status == StayStatus.CheckedIn) &&

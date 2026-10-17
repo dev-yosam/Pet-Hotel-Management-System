@@ -6,6 +6,7 @@ export function sydneyTimeToUtc(value: string): string {
   try {
     return Temporal.PlainDateTime.from(value)
       .toZonedDateTime(bookingTimeZone, {
+        // Ask for another time if daylight saving makes this time missing or repeated.
         disambiguation: 'reject',
       })
       .toInstant()

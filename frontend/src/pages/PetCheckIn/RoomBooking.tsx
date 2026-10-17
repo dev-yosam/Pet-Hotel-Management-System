@@ -1,4 +1,4 @@
-﻿import DateInput from '../../components/DateInput'
+import DateInput from '../../components/DateInput'
 import { useState } from 'react'
 import StayActions from '../../components/StayActions'
 import { Link } from 'react-router'
@@ -38,7 +38,6 @@ function RoomBooking({ pet }: RoomBookingProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [booking, setBooking] = useState<BookingResponse | null>(null)
-
   const busy = searching || saving
 
   function changeDates(value: string, field: 'checkIn' | 'checkOut') {
@@ -129,6 +128,7 @@ function RoomBooking({ pet }: RoomBookingProps) {
     } catch (error) {
       showError(error)
 
+      // Another booking may have taken the room since the last search.
       if (error instanceof ApiError && error.status === 409) {
         setRooms([])
         setRoomId('')
@@ -145,7 +145,6 @@ function RoomBooking({ pet }: RoomBookingProps) {
         <Typography variant="h6" component="h2">
           Room Booking
         </Typography>
-
         <Typography>
           Pet: {pet.name} — {pet.species} (ID: {pet.id})
         </Typography>

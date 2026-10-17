@@ -53,6 +53,7 @@ function DailyCare() {
     if (stayId === '') {
       return () => controller.abort()
     }
+    // Cancel the old request when the user switches to another stay.
     getCareTasks(stayId, controller.signal)
       .then(setTasks)
       .catch((reason: unknown) => {

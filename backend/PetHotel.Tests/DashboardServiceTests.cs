@@ -135,6 +135,37 @@ public class DashboardServiceTests
         });
     }
 
+    [Test]
+    public async Task Rooms_IncludeAllTwelveAndOnlyCurrentOccupants()
+    {
+        await RoomSeeder.SeedAsync(db);
+        var rooms = await db.Rooms.OrderBy(room => room.RoomNumber).ToListAsync();
+        AddStay(rooms[0], StayStatus.CheckedIn, clock.Now);
+        AddStay(rooms[1], StayStatus.Booked, null);
+        var departed = AddStay(rooms[2], StayStatus.CheckedOut, clock.Now.AddDays(-1));
+        departed.ActualCheckOut = clock.Now;
+        AddStay(rooms[3], StayStatus.Cancelled, null);
+        await db.SaveChangesAsync();
+
+        var service = new DashboardService(db, clock);
+        var summary = await service.GetSummaryAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(summary.Rooms.Count, Is.EqualTo(12));
+            Assert.That(summary.Rooms.Select(room => room.RoomNumber),
+                Is.EqualTo(rooms.Select(room => room.RoomNumber)));
+            Assert.That(summary.Rooms[0].PetName, Is.EqualTo("Milo"));
+            Assert.That(summary.Rooms.Skip(1).All(room => room.PetName is null), Is.True);
+        });
+
+        var current = await db.Stays.SingleAsync(stay => stay.Status == StayStatus.CheckedIn);
+        current.Status = StayStatus.CheckedOut;
+        current.ActualCheckOut = clock.Now;
+        await db.SaveChangesAsync();
+        var updated = await service.GetSummaryAsync();
+        Assert.That(updated.Rooms.All(room => room.PetName is null), Is.True);
+    }
+
     private Stay AddStay(Room room, StayStatus status, DateTimeOffset? checkIn)
     {
         var stay = new Stay

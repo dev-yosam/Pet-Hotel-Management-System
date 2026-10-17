@@ -26,6 +26,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
     headers,
   })
 
+  // Delete requests may succeed with no response body.
   const text = await response.text()
   const isJson = response.headers.get('Content-Type')?.includes('json')
   let data: unknown = text || undefined

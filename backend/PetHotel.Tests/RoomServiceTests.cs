@@ -196,6 +196,26 @@ public class RoomServiceTests
         });
     }
 
+    [Test]
+    public async Task SeedRooms_CreatesSixOfEachTypeWithoutDuplicates()
+    {
+        await RoomSeeder.SeedAsync(dbContext);
+        var numbers = Enumerable.Range(101, 6).Concat(Enumerable.Range(201, 6))
+            .Select(number => number.ToString()).ToArray();
+        var firstIds = await dbContext.Rooms.Where(room => numbers.Contains(room.RoomNumber))
+            .OrderBy(room => room.RoomNumber).Select(room => room.Id).ToListAsync();
+        await RoomSeeder.SeedAsync(dbContext);
+        var rooms = await dbContext.Rooms.Where(room => numbers.Contains(room.RoomNumber))
+            .OrderBy(room => room.RoomNumber).ToListAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(rooms.Count, Is.EqualTo(12));
+            Assert.That(rooms.Count(room => room.RoomType == "Standard"), Is.EqualTo(6));
+            Assert.That(rooms.Count(room => room.RoomType == "Deluxe"), Is.EqualTo(6));
+            Assert.That(rooms.Select(room => room.Id), Is.EqualTo(firstIds));
+        });
+    }
+
     private async Task<Room> AddRoomAsync(
         string? roomNumber = null,
         bool isActive = true)

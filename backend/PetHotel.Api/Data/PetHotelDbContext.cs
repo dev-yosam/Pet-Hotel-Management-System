@@ -41,6 +41,7 @@ public class PetHotelDbContext(DbContextOptions<PetHotelDbContext> options) : Db
         {
             entity.Property(stay => stay.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(stay => stay.TotalCharge).HasPrecision(10, 2);
+            // Keep stay history when a pet or room is still referenced.
             entity.HasOne(stay => stay.Pet).WithMany(pet => pet.Stays)
                 .HasForeignKey(stay => stay.PetId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(stay => stay.Room).WithMany(room => room.Stays)
@@ -69,6 +70,7 @@ public class PetHotelDbContext(DbContextOptions<PetHotelDbContext> options) : Db
             {
                 table.HasCheckConstraint("CK_CareRecords_Description",
                     "length(btrim(\"Description\")) > 0");
+                // A completed task must have a completion time, and an unfinished task must not.
                 table.HasCheckConstraint("CK_CareRecords_Completion",
                     "(\"IsCompleted\" AND \"CompletedAt\" IS NOT NULL) OR (NOT \"IsCompleted\" AND \"CompletedAt\" IS NULL)");
             });
