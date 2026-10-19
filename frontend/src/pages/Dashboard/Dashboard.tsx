@@ -3,16 +3,19 @@ import { Alert, Box, Button, LinearProgress, Paper, Stack, Table, TableBody, Tab
 import { getDashboardSummary, type DashboardSummary, type DashboardRoom } from '../../services/dashboardService'
 import { getErrorMessage } from '../../services/apiErrors'
 
+// Show current occupancy, not future room bookings.
 function roomStatus(room: DashboardRoom) {
   return room.petName !== null ? 'Occupied' : room.isActive ? 'Available' : 'Inactive'
 }
 
+// Display the statistics and room list returned by the backend.
 function Dashboard() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [refresh, setRefresh] = useState(0)
 
+  // Clear the old summary and request the latest figures.
   function refreshSummary() {
     setLoading(true)
     setError('')
@@ -20,6 +23,7 @@ function Dashboard() {
     setRefresh(value => value + 1)
   }
 
+  // Load the summary and cancel the request if the user leaves the page.
   useEffect(() => {
     const controller = new AbortController()
     getDashboardSummary(controller.signal)

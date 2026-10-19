@@ -11,6 +11,7 @@ public class StayHistoryService(PetHotelDbContext db) : IStayHistoryService
 {
     private static readonly TimeZoneInfo HotelTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Australia/Sydney");
 
+    // Check the search filters and return one page of sorted stay records.
     public async Task<StayHistoryResult> SearchAsync(StayHistoryQuery query, CancellationToken cancellationToken = default)
     {
         var errors = new List<ValidationResult>();
@@ -33,7 +34,7 @@ public class StayHistoryService(PetHotelDbContext db) : IStayHistoryService
             var status = Enum.Parse<StayStatus>(query.Status);
             stays = stays.Where(stay => stay.Status == status);
         }
-        // Search planned arrival dates in Sydney, including both selected dates.
+        // Search planned arrival dates in Sydney, including both selected dates
         if (query.From is { } from)
         {
             var start = MidnightUtc(from);
@@ -45,7 +46,7 @@ public class StayHistoryService(PetHotelDbContext db) : IStayHistoryService
             stays = stays.Where(stay => stay.ScheduledCheckIn < end);
         }
         var total = await stays.CountAsync(cancellationToken);
-        // Use the ID to keep page order stable when names or dates are the same.
+        // Use the Id to keep page order stable when names or dates are the same.
         var sorted = query.Sort switch
         {
             "oldest" => stays.OrderBy(stay => stay.ScheduledCheckIn).ThenBy(stay => stay.Id),
@@ -63,6 +64,7 @@ public class StayHistoryService(PetHotelDbContext db) : IStayHistoryService
         return new StayHistoryResult(items, total, query.Page, query.PageSize);
     }
 
+    // Convert midnight in Sydney to UTC for the database date filter.
     private static DateTimeOffset MidnightUtc(DateOnly date) =>
         new(TimeZoneInfo.ConvertTimeToUtc(date.ToDateTime(TimeOnly.MinValue), HotelTimeZone));
 }

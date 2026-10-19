@@ -16,10 +16,12 @@ const emptyFilters: StayHistoryFilters = { pet: '', owner: '', from: '', to: '',
 const statuses: Record<string, string> = {
   Booked: 'Booked', CheckedIn: 'Checked in', CheckedOut: 'Checked out', Cancelled: 'Cancelled',
 }
+// Show Sydney time, or a message when no time has been recorded.
 function formatTime(value: string | null) {
   return value ? formatSydneyTime(value) : 'Not recorded'
 }
 
+// Search stay records and show their details and available stay actions.
 function StayHistory() {
   const [filters, setFilters] = useState(emptyFilters)
   const [request, setRequest] = useState({ filters: emptyFilters, page: 1 })
@@ -30,6 +32,7 @@ function StayHistory() {
   const [selected, setSelected] = useState<StayHistoryItem | null>(null)
   const [success, setSuccess] = useState('')
 
+  // Fetch the requested page and cancel old requests when the search changes.
   useEffect(() => {
     const controller = new AbortController()
     searchStayHistory(request.filters, request.page, controller.signal)
@@ -41,6 +44,7 @@ function StayHistory() {
     return () => controller.abort()
   }, [request])
 
+  // Close the details and load a page using the chosen filters.
   function load(nextFilters: StayHistoryFilters, page = 1) {
     setLoading(true)
     setError('')
@@ -49,6 +53,7 @@ function StayHistory() {
     setRequest({ filters: { ...nextFilters }, page })
   }
 
+  // Check the date filters before starting a new search on page one.
   function search(event: FormEvent) {
     event.preventDefault()
     if (event.currentTarget.querySelector('[aria-invalid="true"]')) {
@@ -72,12 +77,14 @@ function StayHistory() {
     load(filters)
   }
 
+  // Clear the filters and return to the first page.
   function reset() {
     setFilters(emptyFilters)
     setValidationError('')
     load(emptyFilters)
   }
 
+  // Update a form field without running the search until Search is pressed.
   function updateFilter(key: keyof StayHistoryFilters, value: string) {
     setFilters(current => ({ ...current, [key]: value }))
   }

@@ -7,12 +7,15 @@ namespace PetHotel.Api.Services;
 
 public class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : IExceptionHandler
 {
+    // Turn an exception into an Http status and an error message for the frontend.
     public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception,
         CancellationToken cancellationToken)
     {
+        // Use a general message for unexpected errors.
         var status = StatusCodes.Status500InternalServerError;
         var message = "The request could not be completed. Please try again.";
 
+        // Return 400 for invalid input, 404 for missing records and 409 for conflicts.
         if (exception is ValidationException validationException)
         {
             status = StatusCodes.Status400BadRequest;
@@ -60,6 +63,7 @@ public class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : IExcepti
             logger.LogError(exception, "The API request failed.");
         }
 
+        // Use the same JSON error format across the API.
         context.Response.StatusCode = status;
         await context.Response.WriteAsJsonAsync(new ProblemDetails
         {

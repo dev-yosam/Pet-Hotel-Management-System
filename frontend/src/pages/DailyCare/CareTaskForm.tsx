@@ -11,11 +11,13 @@ interface Props {
   onCreate: (request: CreateCareTask) => Promise<boolean>
 }
 
+// Collect the description and scheduled time for a new care task.
 function CareTaskForm({ stay, disabled, onCreate }: Props) {
   const [description, setDescription] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
   const [errors, setErrors] = useState({ description: '', scheduledAt: '' })
 
+  // Check the description and stay dates before sending the task.
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const text = description.trim()
@@ -39,6 +41,7 @@ function CareTaskForm({ stay, disabled, onCreate }: Props) {
 
     // Send Sydney input as UTC.
     if (await onCreate({ description: text, scheduledAt: date.toISOString() })) {
+      // Clear the form only after the task has been saved.
       setDescription('')
       setScheduledAt('')
     }
