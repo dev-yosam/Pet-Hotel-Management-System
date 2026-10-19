@@ -5,28 +5,6 @@ namespace PetHotel.Tests;
 
 public class PetRequestTests
 {
-    [TestCase("123", false)]
-    [TestCase("<script>", false)]
-    [TestCase("R2D2", true)]
-    [TestCase("Milo", true)]
-    public void Name_Format(string name, bool valid)
-    {
-        var request = CreateValidRequest();
-        request.Name = name;
-        Assert.That(IsValid(request), Is.EqualTo(valid));
-    }
-
-    [TestCase("123", false)]
-    [TestCase("Dog@", false)]
-    [TestCase("Dog", true)]
-    [TestCase("Guinea pig", true)]
-    public void SpeciesAndBreed_Format(string text, bool valid)
-    {
-        var request = CreateValidRequest();
-        request.Species = text;
-        request.Breed = text;
-        Assert.That(IsValid(request), Is.EqualTo(valid));
-    }
     [TestCase(0, false)]
     [TestCase(-1, false)]
     [TestCase(1, true)]

@@ -9,7 +9,7 @@ namespace PetHotel.Api.Services;
 
 public class CareService(PetHotelDbContext db) : ICareService
 {
-    // Include past stays only when they have care records to view.
+    // List checked-in stays and other stays that have care records.
     public async Task<List<CareStayDto>> GetStaysAsync(CancellationToken cancellationToken = default)
     {
         var stays = await db.Stays.AsNoTracking()
@@ -35,6 +35,7 @@ public class CareService(PetHotelDbContext db) : ICareService
             stay.ScheduledCheckOut, stay.CareInstructions)).ToList();
     }
 
+    // Get the care tasks for one stay, ordered by scheduled time.
     public async Task<List<CareTaskDto>> GetTasksAsync(int stayId, CancellationToken cancellationToken = default)
     {
         if (!await db.Stays.AnyAsync(stay => stay.Id == stayId, cancellationToken))
@@ -48,6 +49,7 @@ public class CareService(PetHotelDbContext db) : ICareService
             .ToListAsync(cancellationToken);
     }
 
+    // Get one care task, or report that it was not found.
     public async Task<CareTaskDto> GetTaskAsync(int taskId, CancellationToken cancellationToken = default)
     {
         var record = await db.CareRecords.AsNoTracking()
@@ -56,6 +58,7 @@ public class CareService(PetHotelDbContext db) : ICareService
         return ToDto(record);
     }
 
+    // Add a task only for a checked-in pet, after checking the description and time.
     public async Task<CareTaskDto> CreateTaskAsync(
     int stayId,
     CreateCareTaskRequest request,
@@ -110,6 +113,7 @@ public class CareService(PetHotelDbContext db) : ICareService
         return ToDto(record);
     }
 
+    // Mark a task as completed or unfinished while the pet is checked in
     public async Task<CareTaskDto> UpdateCompletionAsync(
     int taskId,
     bool isCompleted,
@@ -138,6 +142,7 @@ public class CareService(PetHotelDbContext db) : ICareService
         return ToDto(record);
     }
 
+    // Delete only unfinished tasks for a checked-in pet.
     public async Task DeleteTaskAsync(
     int taskId,
     CancellationToken cancellationToken = default)
@@ -161,6 +166,7 @@ public class CareService(PetHotelDbContext db) : ICareService
         await transaction.CommitAsync(cancellationToken);
     }
 
+    // Lock the stay so check-out cannot happen while a care task is being changed.
     private async Task<Stay> LockStayAsync(
      int stayId,
      CancellationToken cancellationToken)
@@ -181,6 +187,7 @@ public class CareService(PetHotelDbContext db) : ICareService
         return stay;
     }
 
+    // Lock the related stay and load the latest task before making changes
     private async Task<CareRecord> FindTaskWithStayAsync(
         int taskId,
         CancellationToken cancellationToken)
@@ -224,13 +231,14 @@ public class CareService(PetHotelDbContext db) : ICareService
         return record;
     }
 
+    // stop care changes if the pet is not currently checked in.
     private static void RequireCheckedIn(Stay stay)
     {
-        // Past and cancelled stays are read-only.
         if (stay.Status != StayStatus.CheckedIn || stay.ActualCheckOut is not null)
             throw new CareException(CareError.Conflict, "Care tasks can only be changed for checked-in stays.");
     }
 
+    // Copy the task details into the response sent to the frontend.
     private static CareTaskDto ToDto(CareRecord record) =>
         new(record.Id, record.StayId, record.Description, record.ScheduledAt, record.IsCompleted, record.CompletedAt);
 }

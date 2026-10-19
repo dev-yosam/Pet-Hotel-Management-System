@@ -10,10 +10,12 @@ import type { CareStay, CareTask } from '../../types/care'
 import CareTaskForm from './CareTaskForm'
 import { formatSydneyTime } from '../../services/bookingTime'
 
+// Show care task times in Sydney time.
 function formatTime(value: string) {
   return formatSydneyTime(value)
 }
 
+// Show care tasks for the selected stay and let staff update them.
 function DailyCare() {
   const [stays, setStays] = useState<CareStay[]>([])
   const [stayId, setStayId] = useState<number | ''>('')
@@ -29,6 +31,7 @@ function DailyCare() {
 
   useEffect(() => {
     const controller = new AbortController()
+    // Load stays when the page opens or the list is refreshed.
     getCareStays(controller.signal)
       .then((data) => {
         setStays(data)
@@ -71,6 +74,7 @@ function DailyCare() {
   const visibleTasks = tasks.filter((task) =>
     filter === 'all' || (filter === 'completed' ? task.isCompleted : !task.isCompleted))
 
+  // Clear the old tasks and fetch the latest stay and task data.
   function reload() {
     setLoadingStays(true)
     setLoadingTasks(stayId !== '')
@@ -78,6 +82,7 @@ function DailyCare() {
     setRefresh((value) => value + 1)
   }
 
+  // Save a task change, show the result and refresh the list after success.
   async function saveChange(action: () => Promise<unknown>, message: string) {
     setBusy(true)
     setError('')

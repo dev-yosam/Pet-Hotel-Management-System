@@ -10,6 +10,7 @@ public class DashboardService(PetHotelDbContext db, TimeProvider timeProvider) :
 {
     private static readonly TimeZoneInfo HotelTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Australia/Sydney");
 
+    // Get current room occupancy and today's statistics using Sydney time.
     public async Task<DashboardSummary> GetSummaryAsync(CancellationToken cancellationToken = default)
     {
         var today = TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), HotelTimeZone).Date;
@@ -44,6 +45,7 @@ public class DashboardService(PetHotelDbContext db, TimeProvider timeProvider) :
             careTasks - completed, Percentage(completed, careTasks)) { Rooms = rooms };
     }
 
+    // Return zero for an empty total, otherwise round the percentage to one decimal place.
     private static decimal Percentage(int count, int total) =>
         total == 0 ? 0 : Math.Round(count * 100m / total, 1);
 }

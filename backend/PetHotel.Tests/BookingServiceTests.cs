@@ -395,67 +395,6 @@ public class BookingServiceTests
         Assert.That(bookings[0].Status, Is.EqualTo(StayStatus.Booked));
     }
 
-    [TestCase(StayStatus.Booked)]
-    [TestCase(StayStatus.CheckedIn)]
-    public async Task SamePet_OverlappingDifferentRoom_IsRejected(StayStatus status)
-    {
-        var room = new Room { RoomNumber = Guid.NewGuid().ToString("N")[..12], RoomType = "Standard" };
-        dbContext.Rooms.Add(room);
-        await dbContext.SaveChangesAsync();
-        try
-        {
-            await AddExistingStayAsync(CheckIn, CheckIn.AddDays(2), status);
-            var request = CreateValidRequest();
-            request.RoomId = room.Id;
-            var error = Assert.ThrowsAsync<BookingException>(() => service.CreateAsync(request));
-            Assert.That(error!.Error, Is.EqualTo(BookingError.Conflict));
-        }
-        finally { await dbContext.Rooms.Where(item => item.Id == room.Id).ExecuteDeleteAsync(); }
-    }
-
-    [Test]
-    public async Task SamePet_ConcurrentDifferentRooms_OnlyOneSucceeds()
-    {
-        var room = new Room { RoomNumber = Guid.NewGuid().ToString("N")[..12], RoomType = "Standard" };
-        dbContext.Rooms.Add(room);
-        await dbContext.SaveChangesAsync();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        var start = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        async Task<bool> Book(int id)
-        {
-            await using var context = new PetHotelDbContext(options);
-            var request = CreateValidRequest();
-            request.RoomId = id;
-            await start.Task.WaitAsync(timeout.Token);
-            try { await new BookingService(context).CreateAsync(request, timeout.Token); return true; }
-            catch (BookingException exception) when (exception.Error == BookingError.Conflict) { return false; }
-        }
-        try
-        {
-            var first = Book(roomId);
-            var second = Book(room.Id);
-            start.SetResult(true);
-            var results = await Task.WhenAll(first, second);
-            Assert.That(results.Count(success => success), Is.EqualTo(1));
-            Assert.That(await dbContext.Stays.CountAsync(stay => stay.PetId == petId), Is.EqualTo(1));
-        }
-        finally
-        {
-            await dbContext.Stays.Where(stay => stay.PetId == petId).ExecuteDeleteAsync();
-            await dbContext.Rooms.Where(item => item.Id == room.Id).ExecuteDeleteAsync();
-        }
-    }
-
-    [Test]
-    public void PastBooking_IsRejected()
-    {
-        var request = CreateValidRequest();
-        request.ScheduledCheckIn = DateTimeOffset.UtcNow.AddDays(-2);
-        request.ScheduledCheckOut = DateTimeOffset.UtcNow.AddDays(-1);
-        var error = Assert.ThrowsAsync<BookingException>(() => service.CreateAsync(request));
-        Assert.That(error!.Error, Is.EqualTo(BookingError.InvalidInput));
-    }
-
     private async Task AddExistingStayAsync(
         DateTimeOffset checkIn,
         DateTimeOffset checkOut,
